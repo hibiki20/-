@@ -1,8 +1,12 @@
-[{
-      "relation": ["delegate_permission/common.handle_all_urls"],
-      "target": {
-        "namespace": "android_app",
-        "package_name": "io.github.hibiki20.twa",
-        "sha256_cert_fingerprints": ["06:15:DF:9B:BA:8A:26:35:06:6D:0B:28:74:C3:F0:1D:83:40:8E:08:EB:03:FF:3E:5A:84:99:AA:DE:74:6D:12"]
-      }
-    }]
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.hibiki20.mitsumori",
+      "sha256_cert_fingerprints": [
+        "8F:BF:DD:F2:6D:E0:83:CE:AB:45:D9:38:A3:7C:51:F0:F8:69:D8:A2:A2:61:F6:64:7C:B5:EC:A0:CB:AD:3D:E1"
+      ]
+    }
+  }
+]
