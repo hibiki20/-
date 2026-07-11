@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#12142a" id="themeColorMeta">
-<meta name="description" content="無限に遊べるお絵かきロジック（ノノグラム）パズルゲーム">
+<meta name="description" content="1000問のレベルと無限に遊べるエンドレスモードを収録したお絵かきロジック（ノノグラム）パズルゲーム">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
@@ -19,12 +19,17 @@
   --border: #2c2f5c;
   --primary: #5b6ef0;
   --primary-dark: #4553c9;
-  --cell-blank: #242754;
-  --cell-blank-hover: #2c2f66;
-  --wrong: #e5484d;
-  --grid-line: #383b73;
-  --grid-line-strong: #4c5099;
   --radius: 16px;
+  --gold: #f0b429;
+  /* 盤面は常に白黒（紙のノノグラム風）。テーマに関係なく固定 */
+  --paper: #ffffff;
+  --ink: #1a1a1a;
+  --clue-text: #4b4e68;
+  --paper-line: #d3d5e2;
+  --paper-line-strong: #32344d;
+  --mark-color: #9a9cb0;
+  --wrong-bg: #ffe1e1;
+  --wrong-text: #d92d2d;
 }
 body.light {
   --bg: #eef0fa;
@@ -35,11 +40,6 @@ body.light {
   --border: #dee1f2;
   --primary: #4f63d2;
   --primary-dark: #3b4cb8;
-  --cell-blank: #eceefb;
-  --cell-blank-hover: #e0e3f8;
-  --wrong: #e5484d;
-  --grid-line: #ccd0ec;
-  --grid-line-strong: #9aa1d9;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body { height: 100%; }
@@ -61,18 +61,17 @@ body {
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  padding-bottom: env(safe-area-inset-bottom);
 }
 
 /* ヘッダー */
 .header {
   background: var(--card);
-  padding: 14px 16px 10px;
+  padding: 12px 16px 10px;
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
 .title-row { display: flex; align-items: center; justify-content: space-between; }
-.title-row h1 { font-size: 18px; font-weight: 800; letter-spacing: .01em; }
+.title-row h1 { font-size: 17px; font-weight: 800; letter-spacing: .01em; }
 .icon-btn {
   width: 38px; height: 38px;
   border: none; border-radius: 10px;
@@ -80,11 +79,25 @@ body {
   font-size: 17px;
   cursor: pointer;
 }
+.mode-tabs { display: flex; gap: 8px; margin-top: 9px; }
+.mode-tab {
+  flex: 1;
+  height: 36px;
+  border: 1.5px solid var(--border);
+  background: var(--card2);
+  color: var(--text-sub);
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.mode-tab.on { background: var(--primary); border-color: var(--primary); color: #fff; }
 .stat-row {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 9px;
 }
 .stat {
   background: var(--card2);
@@ -94,7 +107,7 @@ body {
 }
 .stat span {
   display: block;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
@@ -106,16 +119,13 @@ body {
   margin-top: 1px;
 }
 
-/* ツールバー */
-.toolbar {
+/* 上部バー（モードごとの操作） */
+.topbar {
   flex-shrink: 0;
-  padding: 10px 16px;
+  padding: 9px 16px 6px;
   display: flex;
-  flex-direction: column;
   gap: 8px;
-  background: var(--bg);
 }
-.toolbar-row { display: flex; gap: 8px; }
 .tbtn {
   flex: 1;
   height: 42px;
@@ -127,12 +137,6 @@ body {
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
-}
-.tbtn.icon { flex: 0 0 46px; font-size: 17px; }
-.tbtn.mode-btn.on {
-  border-color: var(--primary);
-  color: #fff;
-  background: var(--primary);
 }
 .size-select {
   flex: 1;
@@ -147,12 +151,26 @@ body {
   padding: 0 10px;
   appearance: none;
 }
+.tier-seg { display: flex; gap: 6px; flex: 1; }
+.tier-btn {
+  flex: 1;
+  height: 42px;
+  border: 1.5px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 10px;
+  font-size: 12.5px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.tier-btn.on { border-color: var(--primary); background: var(--primary); color: #fff; }
 
 /* 盤面 */
 .board-wrap {
   flex: 1;
   min-height: 0;
-  padding: 0 12px 12px;
+  padding: 0 12px 10px;
 }
 .board-scroll {
   width: 100%;
@@ -171,18 +189,18 @@ body {
   position: sticky;
   top: 0; left: 0;
   z-index: 5;
-  background: var(--card);
+  background: var(--paper);
 }
 .clue {
-  background: var(--card);
-  color: var(--text-sub);
+  background: var(--paper);
+  color: var(--clue-text);
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
-  border: 1px solid var(--border);
+  border: 1px solid var(--paper-line);
   transition: opacity .2s;
 }
-.clue.done { opacity: .32; text-decoration: line-through; }
+.clue.done { color: #c7c9dc; text-decoration: line-through; }
 .clue-top {
   position: sticky;
   top: 0;
@@ -195,7 +213,7 @@ body {
   line-height: 1.15;
 }
 .clue-top span { display: block; }
-.clue-top.thick-r { border-right: 2px solid var(--grid-line-strong); }
+.clue-top.thick-r { border-right: 2px solid var(--paper-line-strong); }
 .clue-left {
   position: sticky;
   left: 0;
@@ -208,30 +226,68 @@ body {
 }
 .clue-left span { display: inline-block; margin-left: 4px; }
 .clue-left span:first-child { margin-left: 0; }
-.clue-left.thick-b { border-bottom: 2px solid var(--grid-line-strong); }
+.clue-left.thick-b { border-bottom: 2px solid var(--paper-line-strong); }
 .cell {
   width: var(--cell);
   height: var(--cell);
-  background: var(--cell-blank);
-  border: 1px solid var(--grid-line);
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
   cursor: pointer;
   position: relative;
   -webkit-touch-callout: none;
   -webkit-user-select: none;
   user-select: none;
-  touch-action: manipulation;
+  touch-action: none;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: calc(var(--cell) * 0.55);
   font-weight: 700;
-  transition: background-color .1s;
+  color: var(--mark-color);
 }
-.cell.thick-r { border-right: 2px solid var(--grid-line-strong); }
-.cell.thick-b { border-bottom: 2px solid var(--grid-line-strong); }
-.cell.filled { background: var(--primary); }
-.cell.marked { color: var(--text-sub); }
-.cell.wrong { background: rgba(229, 72, 77, .18); color: var(--wrong); }
+.cell.thick-r { border-right: 2px solid var(--paper-line-strong); }
+.cell.thick-b { border-bottom: 2px solid var(--paper-line-strong); }
+.cell.filled { background: var(--ink); }
+.cell.wrong { background: var(--wrong-bg); color: var(--wrong-text); }
+
+/* 下部バー（主要操作：親指で押しやすい位置） */
+.bottombar {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--border);
+}
+.bottombar .mode-btn {
+  flex: 1.3;
+  height: 58px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 20px;
+  cursor: pointer;
+}
+.bottombar .mode-btn span { font-size: 11.5px; font-weight: 700; }
+.bottombar .mode-btn.on { border-color: var(--primary); background: var(--primary); color: #fff; }
+.bottombar .icon-btn-lg {
+  flex: 0.8;
+  height: 58px;
+  border-radius: 14px;
+  border: 1.5px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+  font-size: 22px;
+  cursor: pointer;
+}
+.bottombar button:active { transform: scale(.96); }
 
 /* モーダル */
 .modal {
@@ -254,6 +310,7 @@ body {
   justify-content: space-between;
   align-items: center;
   padding: 16px 18px 12px;
+  flex-shrink: 0;
 }
 .sheet-head strong { font-size: 16px; }
 .sheet-close {
@@ -303,7 +360,7 @@ body {
 }
 .seg-btn.on { border-color: var(--primary); color: #fff; background: var(--primary); }
 .howto { font-size: 12.5px; line-height: 1.8; color: var(--text-sub); }
-.hint-count { font-size: 12px; color: var(--text-sub); margin-top: 10px; line-height: 1.7; }
+.hint-count { font-size: 12px; color: var(--text-sub); line-height: 1.7; }
 
 .btn {
   display: flex;
@@ -322,6 +379,44 @@ body {
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-outline { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
 
+/* レベル一覧 */
+.level-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin: 14px 0 4px;
+}
+.level-cell {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--card2);
+  color: var(--text-sub);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.level-cell.cleared { background: var(--primary); border-color: var(--primary); color: #fff; }
+.level-cell.current { outline: 2.5px solid var(--gold); outline-offset: 1px; }
+.level-cell .check {
+  position: absolute;
+  top: -6px; right: -6px;
+  width: 16px; height: 16px;
+  border-radius: 50%;
+  background: #22c55e;
+  color: #fff;
+  font-size: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
 /* クリアモーダル */
 .win-sheet { padding: 30px 24px calc(24px + env(safe-area-inset-bottom)); text-align: center; }
 .win-emoji { font-size: 52px; }
@@ -334,7 +429,7 @@ body {
 .toast {
   position: fixed;
   left: 50%;
-  bottom: 30px;
+  bottom: 90px;
   transform: translateX(-50%);
   background: rgba(15, 17, 40, 0.92);
   color: #fff;
@@ -347,6 +442,9 @@ body {
   transition: opacity .25s;
   z-index: 300;
   white-space: nowrap;
+  max-width: 88vw;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 .toast.show { opacity: 1; }
 </style>
@@ -359,37 +457,69 @@ body {
       <h1>🎨 お絵かきロジック</h1>
       <button class="icon-btn" id="btnSettings">⚙️</button>
     </div>
+    <div class="mode-tabs">
+      <button type="button" class="mode-tab on" id="tabLevels">🎯 レベル（全1000問）</button>
+      <button type="button" class="mode-tab" id="tabEndless">♾️ エンドレス</button>
+    </div>
     <div class="stat-row">
       <div class="stat"><span id="statSize">5×5</span><label>サイズ</label></div>
       <div class="stat"><span id="statTime">00:00</span><label>タイム</label></div>
       <div class="stat"><span id="statMistakes">0</span><label>ミス</label></div>
-      <div class="stat"><span id="statStreak">0</span><label>連続</label></div>
-      <div class="stat"><span id="statBest">0</span><label>ベスト</label></div>
+      <div class="stat"><span id="statStreak">1/300</span><label id="statStreakLabel">レベル</label></div>
+      <div class="stat"><span id="statBest">0/300</span><label id="statBestLabel">達成</label></div>
     </div>
   </div>
 
-  <div class="toolbar">
-    <div class="toolbar-row">
-      <select class="size-select" id="sizeSelect">
-        <option value="S">小 5×5</option>
-        <option value="M">中 8×8</option>
-        <option value="L">大 12×12</option>
-        <option value="XL">特大 15×15</option>
-        <option value="auto">おまかせ（だんだん大きく）</option>
-      </select>
-      <button class="tbtn" id="btnNew">🔄 新しい問題</button>
+  <div class="topbar" id="topbarLevels">
+    <div class="tier-seg" id="tierSeg">
+      <button type="button" class="tier-btn on" data-tier="S">小 5×5</button>
+      <button type="button" class="tier-btn" data-tier="M">中 8×8</button>
+      <button type="button" class="tier-btn" data-tier="L">大 12×12</button>
+      <button type="button" class="tier-btn" data-tier="XL">特大 15×15</button>
     </div>
-    <div class="toolbar-row">
-      <button class="tbtn mode-btn on" id="modeFillBtn">🖊 塗る</button>
-      <button class="tbtn mode-btn" id="modeMarkBtn">✕ 印をつける</button>
-      <button class="tbtn icon" id="btnUndo" title="元に戻す">↺</button>
-      <button class="tbtn icon" id="btnHint" title="ヒント">💡</button>
-    </div>
+    <button class="tbtn" id="btnLevelList" style="flex:0 0 76px">📋 一覧</button>
+  </div>
+  <div class="topbar" id="topbarEndless" style="display:none">
+    <select class="size-select" id="sizeSelect">
+      <option value="S">小 5×5</option>
+      <option value="M">中 8×8</option>
+      <option value="L">大 12×12</option>
+      <option value="XL">特大 15×15</option>
+      <option value="auto">おまかせ（だんだん大きく）</option>
+    </select>
+    <button class="tbtn" id="btnNew">🔄 新しい問題</button>
   </div>
 
   <div class="board-wrap">
     <div class="board-scroll" id="boardScroll">
       <div class="board" id="board"></div>
+    </div>
+  </div>
+
+  <div class="bottombar">
+    <button class="mode-btn on" id="modeFillBtn">🖊<span>塗る</span></button>
+    <button class="mode-btn" id="modeMarkBtn">✕<span>印</span></button>
+    <button class="icon-btn-lg" id="btnUndo" title="元に戻す">↺</button>
+    <button class="icon-btn-lg" id="btnHint" title="ヒント">💡</button>
+  </div>
+</div>
+
+<!-- レベル一覧モーダル -->
+<div class="modal" id="levelListModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <strong>レベル一覧</strong>
+      <button class="sheet-close" id="btnCloseLevelList">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="tier-seg" id="tierSegModal">
+        <button type="button" class="tier-btn" data-tier="S">5×5</button>
+        <button type="button" class="tier-btn" data-tier="M">8×8</button>
+        <button type="button" class="tier-btn" data-tier="L">12×12</button>
+        <button type="button" class="tier-btn" data-tier="XL">15×15</button>
+      </div>
+      <p class="hint-count" id="tierProgressText" style="margin-top:10px"></p>
+      <div class="level-grid" id="levelGrid"></div>
     </div>
   </div>
 </div>
@@ -416,7 +546,8 @@ body {
         <div class="card-title">遊び方</div>
         <p class="howto">
           数字は、その行・列で連続して塗るマスの数を表します。数字が複数ある場合は、書かれた順番どおりに並び、数字と数字の間には必ず1マス以上の空白が入ります。すべての行と列の数字を満たす塗り方を見つけると、絵が完成します。<br><br>
-          「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。違うマスを塗ると赤く表示されます（何度でもやり直せます）。<br><br>
+          マスの上を指でなぞると連続して塗れます。「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。違うマスを塗ると赤く表示されます（何度でもやり直せます）。<br><br>
+          「レベル」では難易度別に1000問を用意。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードです。<br><br>
           ホーム画面に追加すると、アプリのようにオフラインでも遊べます。
         </p>
       </div>
@@ -437,9 +568,9 @@ body {
     <div class="win-stats">
       <div><strong id="winTime">00:00</strong><span>タイム</span></div>
       <div><strong id="winMistakes">0</strong><span>ミス</span></div>
-      <div><strong id="winStreak">0</strong><span>連続クリア</span></div>
+      <div><strong id="winStreak">0</strong><span id="winStreakLabel">連続クリア</span></div>
     </div>
-    <button class="btn btn-primary" id="btnNext">つぎのパズルへ</button>
+    <button class="btn btn-primary" id="btnNext">つぎへ進む</button>
   </div>
 </div>
 
@@ -448,15 +579,42 @@ body {
 <script>
 "use strict";
 
-var STORAGE_KEY = "oekaki_v1";
-var $ = function(id) { return document.getElementById(id); };
+var STORAGE_KEY = "oekaki_v2";
+var $ = function (id) { return document.getElementById(id); };
+
+var TIERS = [
+  { key: "S", n: 5, count: 300, label: "5×5" },
+  { key: "M", n: 8, count: 300, label: "8×8" },
+  { key: "L", n: 12, count: 250, label: "12×12" },
+  { key: "XL", n: 15, count: 150, label: "15×15" }
+];
+function tierByKey(k) {
+  for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === k) return TIERS[i];
+  return TIERS[0];
+}
 
 var state = null;
-var mode = "fill";
+var mode = "fill"; // 塗る / 印をつける（ペン操作モード）
 var cellEls = [];
 var rowClueEls = [];
 var colClueEls = [];
 var timerHandle = null;
+
+/* ---------- 乱数（シード固定＝同じ番号なら毎回同じ問題） ---------- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = (a + 0x6D2B79F5) | 0;
+    var t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function seedFor(tierKey, idx) {
+  var str = tierKey + "#" + idx;
+  var h = 0;
+  for (var i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+  return h;
+}
 
 /* ---------- パズル生成 ---------- */
 function clueFor(arr) {
@@ -471,23 +629,28 @@ function clueFor(arr) {
   return res;
 }
 
-function generateSolution(n) {
+function generateSolution(n, rng, difficulty) {
+  rng = rng || Math.random;
+  difficulty = difficulty == null ? 0.3 : difficulty;
   var grid = [];
   for (var r = 0; r < n; r++) grid.push(new Array(n).fill(false));
-  var target = Math.round(n * n * (0.42 + Math.random() * 0.16));
+  var fillMin = 0.46 - difficulty * 0.10;
+  var fillSpan = 0.14 + difficulty * 0.12;
+  var target = Math.round(n * n * (fillMin + rng() * fillSpan));
   var filled = 0, attempts = 0, maxAttempts = n * n * 25;
+  var maxWalk = Math.max(2, Math.round(n / 2 - difficulty * (n / 5)));
   while (filled < target && attempts < maxAttempts) {
     attempts++;
-    var r = Math.floor(Math.random() * n);
-    var c = Math.floor(Math.random() * n);
+    var r = Math.floor(rng() * n);
+    var c = Math.floor(rng() * n);
     if (grid[r][c]) continue;
     grid[r][c] = true;
     filled++;
-    var walkLen = 2 + Math.floor(Math.random() * Math.max(2, Math.round(n / 2)));
+    var walkLen = 2 + Math.floor(rng() * Math.max(2, maxWalk));
     var cr = r, cc = c;
     for (var i = 0; i < walkLen && filled < target; i++) {
       var dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
-      var d = dirs[Math.floor(Math.random() * dirs.length)];
+      var d = dirs[Math.floor(rng() * dirs.length)];
       var nr = cr + d[0], nc = cc + d[1];
       if (nr < 0 || nr >= n || nc < 0 || nc >= n) continue;
       if (!grid[nr][nc]) { grid[nr][nc] = true; filled++; }
@@ -497,8 +660,8 @@ function generateSolution(n) {
   return grid;
 }
 
-function buildPuzzle(n) {
-  var sol = generateSolution(n);
+function buildPuzzle(n, rng, difficulty) {
+  var sol = generateSolution(n, rng, difficulty);
   var rowClues = sol.map(clueFor);
   var colClues = [];
   for (var c = 0; c < n; c++) {
@@ -509,13 +672,19 @@ function buildPuzzle(n) {
   return { n: n, solution: sol, rowClues: rowClues, colClues: colClues };
 }
 
-function newGameState(n) {
-  var puzzle = buildPuzzle(n);
+function buildLevelPuzzle(tierKey, idx) {
+  var tier = tierByKey(tierKey);
+  var rng = mulberry32(seedFor(tierKey, idx));
+  var difficulty = tier.count <= 1 ? 0 : (idx - 1) / (tier.count - 1);
+  return buildPuzzle(tier.n, rng, difficulty);
+}
+
+function newGameStateFromPuzzle(puzzle) {
   var cells = [];
   var remaining = 0;
-  for (var r = 0; r < n; r++) {
+  for (var r = 0; r < puzzle.n; r++) {
     var row = [];
-    for (var c = 0; c < n; c++) {
+    for (var c = 0; c < puzzle.n; c++) {
       row.push(0);
       if (puzzle.solution[r][c]) remaining++;
     }
@@ -533,14 +702,22 @@ function sizeForMode(sizeMode, streak) {
 }
 
 function defaultState() {
+  var levelsCurrent = {};
+  for (var i = 0; i < TIERS.length; i++) {
+    var t = TIERS[i];
+    levelsCurrent[t.key] = { idx: 1, game: newGameStateFromPuzzle(buildLevelPuzzle(t.key, 1)) };
+  }
   return {
     theme: "dark",
-    sizeMode: "S",
-    streak: 0,
-    best: 0,
-    totalCleared: 0,
-    game: newGameState(5)
+    mode: "levels",
+    endless: { sizeMode: "S", streak: 0, best: 0, totalCleared: 0, game: newGameStateFromPuzzle(buildPuzzle(5)) },
+    levels: { tier: "S", cleared: {}, current: levelsCurrent }
   };
+}
+
+function currentGame() {
+  if (state.mode === "endless") return state.endless.game;
+  return state.levels.current[state.levels.tier].game;
 }
 
 /* ---------- 保存・読込 ---------- */
@@ -549,7 +726,7 @@ function load() {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       var parsed = JSON.parse(raw);
-      if (parsed && parsed.game && parsed.game.puzzle && parsed.game.cells) {
+      if (parsed && parsed.endless && parsed.endless.game && parsed.levels && parsed.levels.current) {
         state = parsed;
         return;
       }
@@ -566,7 +743,8 @@ function toast(msg) {
   var t = $("toast");
   t.textContent = msg;
   t.classList.add("show");
-  setTimeout(function () { t.classList.remove("show"); }, 1800);
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(function () { t.classList.remove("show"); }, 2400);
 }
 function vibrate(ms) {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
@@ -576,11 +754,11 @@ function fmtTime(s) {
   return String(m).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
 }
 function cellSizeFor(n) {
-  if (n <= 5) return 46;
-  if (n <= 8) return 38;
-  if (n <= 11) return 32;
-  if (n <= 15) return 27;
-  return 22;
+  if (n <= 5) return 48;
+  if (n <= 8) return 40;
+  if (n <= 11) return 34;
+  if (n <= 15) return 29;
+  return 24;
 }
 function applyTheme() {
   document.body.classList.toggle("light", state.theme === "light");
@@ -591,15 +769,15 @@ function applyTheme() {
 
 /* ---------- 盤面描画 ---------- */
 function applyCellVisual(el, val) {
-  el.classList.remove("filled", "marked", "wrong");
+  el.classList.remove("filled", "wrong");
   el.textContent = "";
   if (val === 1) el.classList.add("filled");
-  else if (val === 2) { el.classList.add("marked"); el.textContent = "✕"; }
+  else if (val === 2) el.textContent = "✕";
   else if (val === 3) { el.classList.add("wrong"); el.textContent = "✕"; }
 }
 
 function renderBoard() {
-  var g = state.game;
+  var g = currentGame();
   var n = g.puzzle.n;
   var board = $("board");
   board.innerHTML = "";
@@ -653,17 +831,13 @@ function renderBoard() {
 }
 
 function rowComplete(r) {
-  var g = state.game, n = g.puzzle.n;
-  for (var c = 0; c < n; c++) {
-    if (g.puzzle.solution[r][c] !== (g.cells[r][c] === 1)) return false;
-  }
+  var g = currentGame(), n = g.puzzle.n;
+  for (var c = 0; c < n; c++) if (g.puzzle.solution[r][c] !== (g.cells[r][c] === 1)) return false;
   return true;
 }
 function colComplete(c) {
-  var g = state.game, n = g.puzzle.n;
-  for (var r = 0; r < n; r++) {
-    if (g.puzzle.solution[r][c] !== (g.cells[r][c] === 1)) return false;
-  }
+  var g = currentGame(), n = g.puzzle.n;
+  for (var r = 0; r < n; r++) if (g.puzzle.solution[r][c] !== (g.cells[r][c] === 1)) return false;
   return true;
 }
 function updateClueStatus(r, c) {
@@ -671,14 +845,13 @@ function updateClueStatus(r, c) {
   colClueEls[c].classList.toggle("done", colComplete(c));
 }
 function updateAllClueStatus() {
-  var n = state.game.puzzle.n;
+  var n = currentGame().puzzle.n;
   for (var r = 0; r < n; r++) rowClueEls[r].classList.toggle("done", rowComplete(r));
   for (var c = 0; c < n; c++) colClueEls[c].classList.toggle("done", colComplete(c));
 }
 
-/* ---------- 操作 ---------- */
-function hasProgress() {
-  var g = state.game;
+/* ---------- マス操作（タップ／ドラッグで連続ペイント） ---------- */
+function hasProgressIn(g) {
   for (var r = 0; r < g.puzzle.n; r++) {
     for (var c = 0; c < g.puzzle.n; c++) {
       if (g.cells[r][c] !== 0) return true;
@@ -686,36 +859,15 @@ function hasProgress() {
   }
   return false;
 }
+function hasProgress() { return hasProgressIn(currentGame()); }
 
-function onTapCell(r, c) {
-  var g = state.game;
-  if (g.solved) return;
-  var cur = g.cells[r][c];
-  var sol = g.puzzle.solution[r][c];
-  var next;
-  if (cur === 0) {
-    if (mode === "fill") {
-      if (sol) { next = 1; g.remaining--; }
-      else { next = 3; g.mistakes++; vibrate(30); }
-    } else {
-      next = 2;
-    }
-  } else {
-    next = 0;
-    if (cur === 1) g.remaining++;
-  }
-  g.history.push({ r: r, c: c, prev: cur });
-  if (g.history.length > 300) g.history.shift();
-  g.cells[r][c] = next;
-  applyCellVisual(cellEls[r][c], next);
-  updateClueStatus(r, c);
-  updateStatsUI();
-  save();
-  if (g.remaining <= 0) onSolved();
+function determineDragAction(cur) {
+  if (mode === "fill") return (cur === 1 || cur === 3) ? "erase" : "fill";
+  return (cur === 2) ? "unmark" : "mark";
 }
 
-function countRemaining() {
-  var g = state.game, n = g.puzzle.n, cnt = 0;
+function countRemainingIn(g) {
+  var n = g.puzzle.n, cnt = 0;
   for (var r = 0; r < n; r++) {
     for (var c = 0; c < n; c++) {
       if (g.puzzle.solution[r][c] && g.cells[r][c] !== 1) cnt++;
@@ -724,20 +876,90 @@ function countRemaining() {
   return cnt;
 }
 
+function applyDragAction(r, c, action) {
+  var g = currentGame();
+  if (g.solved) return;
+  var cur = g.cells[r][c];
+  var sol = g.puzzle.solution[r][c];
+  var next = null;
+  if (action === "fill") {
+    if (cur !== 0) return;
+    next = sol ? 1 : 3;
+  } else if (action === "erase") {
+    if (cur !== 1 && cur !== 3) return;
+    next = 0;
+  } else if (action === "mark") {
+    if (cur !== 0) return;
+    next = 2;
+  } else if (action === "unmark") {
+    if (cur !== 2) return;
+    next = 0;
+  }
+  if (next === null) return;
+  g.history.push({ r: r, c: c, prev: cur });
+  if (g.history.length > 400) g.history.shift();
+  if (cur === 1 && next !== 1) g.remaining++;
+  if (next === 1) g.remaining--;
+  if (action === "fill" && next === 3) { g.mistakes++; vibrate(15); }
+  g.cells[r][c] = next;
+  applyCellVisual(cellEls[r][c], next);
+  updateClueStatus(r, c);
+  updateStatsUI();
+  save();
+  if (g.remaining <= 0) onSolved();
+}
+
+var painting = false, paintAction = null, lastPaintedKey = null;
+
+function cellFromPoint(x, y) {
+  var el = document.elementFromPoint(x, y);
+  if (!el) return null;
+  return el.closest ? el.closest(".cell") : null;
+}
+function boardPointerDown(e) {
+  var cell = e.target.closest && e.target.closest(".cell");
+  if (!cell) return;
+  if (e.pointerType === "mouse" && e.button !== 0) return;
+  var g = currentGame();
+  if (g.solved) return;
+  e.preventDefault();
+  var r = Number(cell.dataset.r), c = Number(cell.dataset.c);
+  paintAction = determineDragAction(g.cells[r][c]);
+  painting = true;
+  lastPaintedKey = r + "_" + c;
+  applyDragAction(r, c, paintAction);
+}
+function docPointerMove(e) {
+  if (!painting) return;
+  var cell = cellFromPoint(e.clientX, e.clientY);
+  if (!cell) return;
+  var r = Number(cell.dataset.r), c = Number(cell.dataset.c);
+  var key = r + "_" + c;
+  if (key === lastPaintedKey) return;
+  lastPaintedKey = key;
+  applyDragAction(r, c, paintAction);
+  e.preventDefault();
+}
+function docPointerUp() {
+  painting = false;
+  paintAction = null;
+  lastPaintedKey = null;
+}
+
 function undo() {
-  var g = state.game;
+  var g = currentGame();
   if (g.solved || !g.history.length) return;
   var last = g.history.pop();
   g.cells[last.r][last.c] = last.prev;
   applyCellVisual(cellEls[last.r][last.c], last.prev);
   updateClueStatus(last.r, last.c);
-  g.remaining = countRemaining();
+  g.remaining = countRemainingIn(g);
   updateStatsUI();
   save();
 }
 
 function hint() {
-  var g = state.game;
+  var g = currentGame();
   if (g.solved) return;
   var n = g.puzzle.n;
   var candidates = [];
@@ -760,88 +982,203 @@ function hint() {
   if (g.remaining <= 0) onSolved();
 }
 
+/* ---------- クリア処理 ---------- */
+function tierClearedCount(tierKey) {
+  var n = 0, prefix = tierKey + "-";
+  for (var k in state.levels.cleared) if (k.indexOf(prefix) === 0) n++;
+  return n;
+}
+function totalClearedCount() {
+  var n = 0;
+  for (var k in state.levels.cleared) n++;
+  return n;
+}
+
 function onSolved() {
-  var g = state.game;
+  var g = currentGame();
   g.solved = true;
-  stopTimer();
-  state.streak++;
-  state.totalCleared++;
-  if (state.streak > state.best) state.best = state.streak;
+  if (state.mode === "endless") {
+    state.endless.streak++;
+    state.endless.totalCleared++;
+    if (state.endless.streak > state.endless.best) state.endless.best = state.endless.streak;
+  } else {
+    var tier = state.levels.tier;
+    var idx = state.levels.current[tier].idx;
+    var key = tier + "-" + idx;
+    var prev = state.levels.cleared[key];
+    if (!prev || g.elapsed < prev.time) {
+      state.levels.cleared[key] = { time: g.elapsed, mistakes: g.mistakes, clearedAt: Date.now() };
+    }
+  }
   save();
   updateStatsUI();
   showWinOverlay();
 }
 
-function startNewPuzzle(resetStreak) {
-  if (resetStreak) state.streak = 0;
-  var n = sizeForMode(state.sizeMode, state.streak);
-  state.game = newGameState(n);
+function startNewEndlessPuzzle(resetStreak) {
+  if (resetStreak) state.endless.streak = 0;
+  var n = sizeForMode(state.endless.sizeMode, state.endless.streak);
+  state.endless.game = newGameStateFromPuzzle(buildPuzzle(n));
   save();
   renderBoard();
   updateStatsUI();
-  startTimer();
+}
+
+function goToLevel(tierKey, idx, opts) {
+  opts = opts || {};
+  var tier = tierByKey(tierKey);
+  idx = Math.max(1, Math.min(tier.count, idx));
+  if (!opts.force) {
+    var curEntry = state.levels.current[tierKey];
+    if (!curEntry.game.solved && hasProgressIn(curEntry.game) && curEntry.idx !== idx) {
+      if (!confirm("このレベルは未完了です。進行状況は保存されません。移動しますか？")) return false;
+    }
+  }
+  state.levels.tier = tierKey;
+  state.levels.current[tierKey] = { idx: idx, game: newGameStateFromPuzzle(buildLevelPuzzle(tierKey, idx)) };
+  save();
+  renderBoard();
+  updateStatsUI();
+  return true;
 }
 
 function confirmAbandonIfNeeded() {
-  var g = state.game;
+  var g = currentGame();
   if (g.solved) return true;
   if (!hasProgress()) return true;
   return confirm("現在の問題を放棄して、新しい問題を始めますか？（連続クリア記録がリセットされます）");
 }
 
-/* ---------- タイマー ---------- */
+/* ---------- タイマー（常時1つだけ動作し、表示中のパズルの経過時間を進める） ---------- */
 function startTimer() {
-  stopTimer();
+  if (timerHandle) return;
   timerHandle = setInterval(function () {
-    if (state.game.solved) return;
-    state.game.elapsed++;
-    $("statTime").textContent = fmtTime(state.game.elapsed);
-    if (state.game.elapsed % 5 === 0) save();
+    var g = currentGame();
+    if (g.solved) return;
+    g.elapsed++;
+    $("statTime").textContent = fmtTime(g.elapsed);
+    if (g.elapsed % 5 === 0) save();
   }, 1000);
-}
-function stopTimer() {
-  if (timerHandle) { clearInterval(timerHandle); timerHandle = null; }
 }
 
 /* ---------- HUD ---------- */
+function updateTierSegActive() {
+  document.querySelectorAll("#tierSeg .tier-btn").forEach(function (b) {
+    b.classList.toggle("on", b.dataset.tier === state.levels.tier);
+  });
+}
+
 function updateStatsUI() {
-  var g = state.game;
+  var g = currentGame();
   $("statSize").textContent = g.puzzle.n + "×" + g.puzzle.n;
   $("statMistakes").textContent = g.mistakes;
-  $("statStreak").textContent = state.streak;
-  $("statBest").textContent = state.best;
   $("statTime").textContent = fmtTime(g.elapsed);
-  $("sizeSelect").value = state.sizeMode;
+  if (state.mode === "endless") {
+    $("statStreakLabel").textContent = "連続";
+    $("statStreak").textContent = state.endless.streak;
+    $("statBestLabel").textContent = "ベスト";
+    $("statBest").textContent = state.endless.best;
+    $("sizeSelect").value = state.endless.sizeMode;
+  } else {
+    var tier = state.levels.tier;
+    var t = tierByKey(tier);
+    var idx = state.levels.current[tier].idx;
+    $("statStreakLabel").textContent = "レベル";
+    $("statStreak").textContent = idx + "/" + t.count;
+    $("statBestLabel").textContent = "達成";
+    $("statBest").textContent = tierClearedCount(tier) + "/" + t.count;
+    updateTierSegActive();
+  }
 }
 
 function showWinOverlay() {
-  var g = state.game;
+  var g = currentGame();
   $("winTime").textContent = fmtTime(g.elapsed);
   $("winMistakes").textContent = g.mistakes;
-  $("winStreak").textContent = state.streak;
+  if (state.mode === "endless") {
+    $("winStreakLabel").textContent = "連続クリア";
+    $("winStreak").textContent = state.endless.streak;
+  } else {
+    var tier = state.levels.tier, t = tierByKey(tier);
+    $("winStreakLabel").textContent = "達成";
+    $("winStreak").textContent = tierClearedCount(tier) + "/" + t.count;
+  }
   $("winModal").classList.add("open");
 }
 
 function syncSettingsUI() {
   applyTheme();
   $("settingsTotals").innerHTML =
-    "これまでにクリアしたパズル：" + state.totalCleared + "問<br>" +
-    "現在の連続クリア：" + state.streak + "　／　ベスト：" + state.best;
+    "レベル：" + totalClearedCount() + " / 1000 クリア<br>" +
+    "エンドレス連続クリア：" + state.endless.streak + "　／　ベスト：" + state.endless.best + "<br>" +
+    "エンドレス累計クリア：" + state.endless.totalCleared + "問";
+}
+
+/* ---------- レベル一覧モーダル ---------- */
+function renderLevelGrid(tierKey) {
+  var t = tierByKey(tierKey);
+  var wrap = $("levelGrid");
+  wrap.innerHTML = "";
+  var curIdx = state.levels.current[tierKey].idx;
+  for (var i = 1; i <= t.count; i++) {
+    (function (idx) {
+      var key = tierKey + "-" + idx;
+      var cleared = state.levels.cleared[key];
+      var cell = document.createElement("button");
+      cell.type = "button";
+      cell.className = "level-cell" +
+        (cleared ? " cleared" : "") +
+        (idx === curIdx && tierKey === state.levels.tier ? " current" : "");
+      cell.textContent = idx;
+      if (cleared) {
+        var badge = document.createElement("span");
+        badge.className = "check";
+        badge.textContent = "✓";
+        cell.appendChild(badge);
+      }
+      cell.addEventListener("click", function () {
+        $("levelListModal").classList.remove("open");
+        goToLevel(tierKey, idx);
+      });
+      wrap.appendChild(cell);
+    })(i);
+  }
+  $("tierProgressText").textContent =
+    t.label + "：" + tierClearedCount(tierKey) + " / " + t.count + " クリア　（全体 " + totalClearedCount() + " / 1000）";
+}
+function openLevelList(tierKey) {
+  document.querySelectorAll("#tierSegModal .tier-btn").forEach(function (b) {
+    b.classList.toggle("on", b.dataset.tier === tierKey);
+  });
+  renderLevelGrid(tierKey);
+  $("levelListModal").classList.add("open");
+}
+
+/* ---------- モード切替 ---------- */
+function setAppMode(m) {
+  state.mode = m;
+  $("tabLevels").classList.toggle("on", m === "levels");
+  $("tabEndless").classList.toggle("on", m === "endless");
+  $("topbarLevels").style.display = m === "levels" ? "flex" : "none";
+  $("topbarEndless").style.display = m === "endless" ? "flex" : "none";
+  save();
+  renderBoard();
+  updateStatsUI();
 }
 
 /* ---------- イベント登録 ---------- */
 document.addEventListener("DOMContentLoaded", function () {
   load();
   applyTheme();
+  setAppMode(state.mode);
   renderBoard();
   updateStatsUI();
-  if (!state.game.solved) startTimer();
+  startTimer();
 
-  $("board").addEventListener("click", function (e) {
-    var cell = e.target.closest(".cell");
-    if (!cell) return;
-    onTapCell(Number(cell.dataset.r), Number(cell.dataset.c));
-  });
+  $("board").addEventListener("pointerdown", boardPointerDown, { passive: false });
+  document.addEventListener("pointermove", docPointerMove, { passive: false });
+  document.addEventListener("pointerup", docPointerUp);
+  document.addEventListener("pointercancel", docPointerUp);
   $("board").addEventListener("contextmenu", function (e) { e.preventDefault(); });
 
   $("modeFillBtn").addEventListener("click", function () {
@@ -858,64 +1195,93 @@ document.addEventListener("DOMContentLoaded", function () {
   $("btnUndo").addEventListener("click", undo);
   $("btnHint").addEventListener("click", hint);
 
+  $("tabLevels").addEventListener("click", function () { if (state.mode !== "levels") setAppMode("levels"); });
+  $("tabEndless").addEventListener("click", function () { if (state.mode !== "endless") setAppMode("endless"); });
+
+  document.querySelectorAll("#tierSeg .tier-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var tierKey = this.dataset.tier;
+      if (tierKey === state.levels.tier) return;
+      state.levels.tier = tierKey;
+      save();
+      renderBoard();
+      updateStatsUI();
+    });
+  });
+  document.querySelectorAll("#tierSegModal .tier-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll("#tierSegModal .tier-btn").forEach(function (b) { b.classList.remove("on"); });
+      this.classList.add("on");
+      renderLevelGrid(this.dataset.tier);
+    });
+  });
+  $("btnLevelList").addEventListener("click", function () { openLevelList(state.levels.tier); });
+  $("btnCloseLevelList").addEventListener("click", function () { $("levelListModal").classList.remove("open"); });
+  $("levelListModal").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
   $("btnNew").addEventListener("click", function () {
     if (!confirmAbandonIfNeeded()) return;
-    var reset = !state.game.solved && hasProgress();
-    startNewPuzzle(reset);
+    var reset = !state.endless.game.solved && hasProgress();
+    startNewEndlessPuzzle(reset);
   });
 
   $("sizeSelect").addEventListener("change", function () {
     var newMode = this.value;
-    if (newMode === state.sizeMode) return;
-    if (!confirmAbandonIfNeeded()) { this.value = state.sizeMode; return; }
-    var reset = !state.game.solved && hasProgress();
-    state.sizeMode = newMode;
-    startNewPuzzle(reset);
+    if (newMode === state.endless.sizeMode) return;
+    if (!confirmAbandonIfNeeded()) { this.value = state.endless.sizeMode; return; }
+    var reset = !state.endless.game.solved && hasProgress();
+    state.endless.sizeMode = newMode;
+    startNewEndlessPuzzle(reset);
   });
 
   $("btnSettings").addEventListener("click", function () {
     syncSettingsUI();
     $("settingsModal").classList.add("open");
   });
-  $("btnCloseSettings").addEventListener("click", function () {
-    $("settingsModal").classList.remove("open");
-  });
-  $("settingsModal").addEventListener("click", function (e) {
-    if (e.target === this) this.classList.remove("open");
-  });
+  $("btnCloseSettings").addEventListener("click", function () { $("settingsModal").classList.remove("open"); });
+  $("settingsModal").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
 
-  $("themeLightBtn").addEventListener("click", function () {
-    state.theme = "light";
-    applyTheme();
-    save();
-  });
-  $("themeDarkBtn").addEventListener("click", function () {
-    state.theme = "dark";
-    applyTheme();
-    save();
-  });
+  $("themeLightBtn").addEventListener("click", function () { state.theme = "light"; applyTheme(); save(); });
+  $("themeDarkBtn").addEventListener("click", function () { state.theme = "dark"; applyTheme(); save(); });
 
   $("btnResetProgress").addEventListener("click", function () {
     if (!confirm("記録・進行状況をすべて削除して最初からやり直します。よろしいですか？")) return;
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
     state = defaultState();
     applyTheme();
+    setAppMode(state.mode);
     renderBoard();
     updateStatsUI();
-    startTimer();
     $("settingsModal").classList.remove("open");
     toast("リセットしました");
   });
 
   $("btnNext").addEventListener("click", function () {
     $("winModal").classList.remove("open");
-    startNewPuzzle(false);
+    if (state.mode === "endless") {
+      startNewEndlessPuzzle(false);
+      return;
+    }
+    var tier = state.levels.tier;
+    var t = tierByKey(tier);
+    var nextIdx = state.levels.current[tier].idx + 1;
+    if (nextIdx > t.count) {
+      var tIdx = -1;
+      for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === tier) tIdx = i;
+      if (tIdx > -1 && tIdx < TIERS.length - 1) {
+        var nextTier = TIERS[tIdx + 1];
+        toast(t.label + "を全てクリアしました！次は" + nextTier.label + "に挑戦");
+        goToLevel(nextTier.key, state.levels.current[nextTier.key].idx, { force: true });
+      } else {
+        toast("全1000レベルクリア！お見事です🎉");
+        openLevelList(tier);
+      }
+      return;
+    }
+    goToLevel(tier, nextIdx, { force: true });
   });
   $("winModal").addEventListener("click", function (e) {
-    if (e.target === this) {
-      this.classList.remove("open");
-      startNewPuzzle(false);
-    }
+    if (e.target === this) { this.classList.remove("open"); }
   });
 
   if ("serviceWorker" in navigator && location.protocol === "https:") {
