@@ -1,4 +1,4 @@
-var CACHE = "mitsumori-v3";
+var CACHE = "oekaki-logic-v1";
 var FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", function(e) {
@@ -14,7 +14,6 @@ self.addEventListener("activate", function(e) {
 });
 
 self.addEventListener("fetch", function(e) {
-  // Firebaseなど外部との通信・データ送信には割り込まない（GET かつ 自サイト内のみ扱う）
   if (e.request.method !== "GET") return;
   var url = new URL(e.request.url);
   if (url.origin !== self.location.origin) return;
