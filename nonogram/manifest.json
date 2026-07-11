@@ -1,12 +1,12 @@
 {
-  "name": "見積・請求書",
-  "short_name": "見積書",
-  "description": "見積書・請求書をスマホでかんたん作成",
+  "name": "お絵かきロジック",
+  "short_name": "おえかきロジック",
+  "description": "無限に遊べるお絵かきロジック（ノノグラム）パズル",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f2f3f7",
+  "background_color": "#15172c",
   "theme_color": "#4f63d2",
   "lang": "ja",
   "icons": [
