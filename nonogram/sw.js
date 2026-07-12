@@ -1,4 +1,4 @@
-var CACHE = "oekaki-logic-v2";
+var CACHE = "oekaki-logic-v3";
 var FILES = ["./", "./index.html", "./manifest.json", "./icon-192.png", "./icon-512.png", "./privacy.html"];
 
 self.addEventListener("install", function(e) {
