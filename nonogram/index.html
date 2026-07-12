@@ -28,8 +28,8 @@
   --paper-line: #d3d5e2;
   --paper-line-strong: #32344d;
   --mark-color: #9a9cb0;
-  --wrong-bg: #ffe1e1;
-  --wrong-text: #d92d2d;
+  --wrong-bg: #e5484d;
+  --missed-bg: #b7ecc4;
 }
 body.light {
   --bg: #eef0fa;
@@ -122,9 +122,9 @@ body {
 /* 上部バー（モードごとの操作） */
 .topbar {
   flex-shrink: 0;
-  padding: 9px 16px 6px;
+  padding: 9px 12px 6px;
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 .tbtn {
   flex: 1;
@@ -151,7 +151,7 @@ body {
   padding: 0 10px;
   appearance: none;
 }
-.tier-seg { display: flex; gap: 6px; flex: 1; }
+.tier-seg { display: flex; gap: 5px; flex: 1; }
 .tier-btn {
   flex: 1;
   height: 42px;
@@ -159,10 +159,11 @@ body {
   background: var(--card);
   color: var(--text);
   border-radius: 10px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 700;
   font-family: inherit;
   cursor: pointer;
+  padding: 0 2px;
 }
 .tier-btn.on { border-color: var(--primary); background: var(--primary); color: #fff; }
 
@@ -194,7 +195,7 @@ body {
 .clue {
   background: var(--paper);
   color: var(--clue-text);
-  font-size: clamp(9px, calc(var(--cell) * 0.34), 12px);
+  font-size: clamp(8px, calc(var(--cell) * 0.34), 12px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   border: 1px solid var(--paper-line);
@@ -209,7 +210,7 @@ body {
   flex-direction: column;
   align-items: center;
   justify-content: flex-end;
-  padding: 3px 3px 4px;
+  padding: 3px 2px 4px;
   line-height: 1.15;
 }
 .clue-top span { display: block; }
@@ -245,10 +246,13 @@ body {
   font-weight: 700;
   color: var(--mark-color);
 }
+.board.scrollable .cell { touch-action: auto; }
 .cell.thick-r { border-right: 2px solid var(--paper-line-strong); }
 .cell.thick-b { border-bottom: 2px solid var(--paper-line-strong); }
 .cell.filled { background: var(--ink); }
-.cell.wrong { background: var(--wrong-bg); color: var(--wrong-text); }
+/* 答え合わせ表示 */
+.cell.rv-wrong { background: var(--wrong-bg); }
+.cell.rv-missed { background: var(--missed-bg); }
 
 /* 下部バー（主要操作：親指で押しやすい位置） */
 .bottombar {
@@ -288,6 +292,26 @@ body {
   cursor: pointer;
 }
 .bottombar button:active { transform: scale(.96); }
+
+/* 答え合わせバー */
+.review-bar {
+  display: none;
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(96px + env(safe-area-inset-bottom));
+  width: calc(100% - 32px);
+  max-width: 520px;
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  z-index: 150;
+  box-shadow: 0 8px 24px rgba(0,0,0,.35);
+}
+.review-bar.show { display: block; }
+.review-bar p { font-size: 12px; color: var(--text-sub); line-height: 1.7; margin-bottom: 10px; }
+.review-bar .legend { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin: 0 3px; }
 
 /* モーダル */
 .modal {
@@ -378,6 +402,7 @@ body {
 .btn:active { transform: scale(0.98); }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-outline { background: transparent; color: var(--primary); border: 1.5px solid var(--primary); }
+.btn + .btn { margin-top: 10px; }
 
 /* レベル一覧 */
 .level-grid {
@@ -420,7 +445,8 @@ body {
 /* クリアモーダル */
 .win-sheet { padding: 30px 24px calc(24px + env(safe-area-inset-bottom)); text-align: center; }
 .win-emoji { font-size: 52px; }
-.win-sheet h2 { font-size: 22px; font-weight: 800; margin: 6px 0 18px; }
+.win-sheet h2 { font-size: 22px; font-weight: 800; margin: 6px 0 6px; }
+.win-note { font-size: 12px; color: var(--text-sub); margin-bottom: 16px; }
 .win-stats { display: flex; justify-content: center; gap: 22px; margin-bottom: 22px; }
 .win-stats div { display: flex; flex-direction: column; align-items: center; gap: 3px; }
 .win-stats span { font-size: 11px; color: var(--text-sub); font-weight: 600; }
@@ -464,27 +490,29 @@ body {
     <div class="stat-row">
       <div class="stat"><span id="statSize">5×5</span><label>サイズ</label></div>
       <div class="stat"><span id="statTime">00:00</span><label>タイム</label></div>
-      <div class="stat"><span id="statMistakes">0</span><label>ミス</label></div>
-      <div class="stat"><span id="statStreak">1/300</span><label id="statStreakLabel">レベル</label></div>
-      <div class="stat"><span id="statBest">0/300</span><label id="statBestLabel">達成</label></div>
+      <div class="stat"><span id="statFill">0/0</span><label>塗り</label></div>
+      <div class="stat"><span id="statStreak">1/250</span><label id="statStreakLabel">レベル</label></div>
+      <div class="stat"><span id="statBest">0/250</span><label id="statBestLabel">達成</label></div>
     </div>
   </div>
 
   <div class="topbar" id="topbarLevels">
     <div class="tier-seg" id="tierSeg">
-      <button type="button" class="tier-btn on" data-tier="S">小 5×5</button>
-      <button type="button" class="tier-btn" data-tier="M">中 8×8</button>
-      <button type="button" class="tier-btn" data-tier="L">大 12×12</button>
-      <button type="button" class="tier-btn" data-tier="XL">特大 15×15</button>
+      <button type="button" class="tier-btn on" data-tier="S">5×5</button>
+      <button type="button" class="tier-btn" data-tier="M">10×10</button>
+      <button type="button" class="tier-btn" data-tier="L">15×15</button>
+      <button type="button" class="tier-btn" data-tier="XL">20×20</button>
+      <button type="button" class="tier-btn" data-tier="XXL">25×25</button>
     </div>
-    <button class="tbtn" id="btnLevelList" style="flex:0 0 76px">📋 一覧</button>
+    <button class="tbtn" id="btnLevelList" style="flex:0 0 66px">📋 一覧</button>
   </div>
   <div class="topbar" id="topbarEndless" style="display:none">
     <select class="size-select" id="sizeSelect">
-      <option value="S">小 5×5</option>
-      <option value="M">中 8×8</option>
-      <option value="L">大 12×12</option>
-      <option value="XL">特大 15×15</option>
+      <option value="S">5×5</option>
+      <option value="M">10×10</option>
+      <option value="L">15×15</option>
+      <option value="XL">20×20</option>
+      <option value="XXL">25×25</option>
       <option value="auto">おまかせ（だんだん大きく）</option>
     </select>
     <button class="tbtn" id="btnNew">🔄 新しい問題</button>
@@ -504,6 +532,12 @@ body {
   </div>
 </div>
 
+<!-- 答え合わせバー -->
+<div class="review-bar" id="reviewBar">
+  <p id="reviewText"></p>
+  <button class="btn btn-primary" id="btnNextFromReview" style="height:42px">つぎへ進む</button>
+</div>
+
 <!-- レベル一覧モーダル -->
 <div class="modal" id="levelListModal">
   <div class="sheet">
@@ -514,9 +548,10 @@ body {
     <div class="sheet-body">
       <div class="tier-seg" id="tierSegModal">
         <button type="button" class="tier-btn" data-tier="S">5×5</button>
-        <button type="button" class="tier-btn" data-tier="M">8×8</button>
-        <button type="button" class="tier-btn" data-tier="L">12×12</button>
-        <button type="button" class="tier-btn" data-tier="XL">15×15</button>
+        <button type="button" class="tier-btn" data-tier="M">10×10</button>
+        <button type="button" class="tier-btn" data-tier="L">15×15</button>
+        <button type="button" class="tier-btn" data-tier="XL">20×20</button>
+        <button type="button" class="tier-btn" data-tier="XXL">25×25</button>
       </div>
       <p class="hint-count" id="tierProgressText" style="margin-top:10px"></p>
       <div class="level-grid" id="levelGrid"></div>
@@ -545,10 +580,10 @@ body {
       <div class="card">
         <div class="card-title">遊び方</div>
         <p class="howto">
-          数字は、その行・列で連続して塗るマスの数を表します。数字が複数ある場合は、書かれた順番どおりに並び、数字と数字の間には必ず1マス以上の空白が入ります。すべての行と列の数字を満たす塗り方を見つけると、絵が完成します。<br><br>
-          マスの上を指でなぞると連続して塗れます。「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。違うマスを塗ると赤く表示されます（何度でもやり直せます）。<br><br>
-          「レベル」では難易度別に1000問を用意。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードです。<br><br>
-          ホーム画面に追加すると、アプリのようにオフラインでも遊べます。
+          数字は、その行・列で連続して塗るマスの数を表します。数字が複数ある場合は、書かれた順番どおりに並び、数字と数字の間には必ず1マス以上の空白が入ります。すべての行と列の数字を満たすように塗ると、絵が完成します。<br><br>
+          マスの上を指でなぞると連続して塗れます。「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。行や列が数字の通りに塗り終わると、残りのマスに自動で✕が付きます。<br><br>
+          すべての行と列の数字を満たすとクリアです。クリア後に「答え合わせ」で、お手本の絵との違いを確認できます。<br><br>
+          「レベル」では難易度別に1000問を用意。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードです。
         </p>
       </div>
       <div class="card">
@@ -565,11 +600,13 @@ body {
   <div class="sheet win-sheet">
     <div class="win-emoji">🎉</div>
     <h2>クリア！</h2>
+    <p class="win-note" id="winNote"></p>
     <div class="win-stats">
       <div><strong id="winTime">00:00</strong><span>タイム</span></div>
-      <div><strong id="winMistakes">0</strong><span>ミス</span></div>
+      <div><strong id="winDiff">0</strong><span>絵との違い</span></div>
       <div><strong id="winStreak">0</strong><span id="winStreakLabel">連続クリア</span></div>
     </div>
+    <button class="btn btn-outline" id="btnReview">🔍 答え合わせを見る</button>
     <button class="btn btn-primary" id="btnNext">つぎへ進む</button>
   </div>
 </div>
@@ -579,14 +616,15 @@ body {
 <script>
 "use strict";
 
-var STORAGE_KEY = "oekaki_v2";
+var STORAGE_KEY = "oekaki_v3";
 var $ = function (id) { return document.getElementById(id); };
 
 var TIERS = [
-  { key: "S", n: 5, count: 300, label: "5×5" },
-  { key: "M", n: 8, count: 300, label: "8×8" },
-  { key: "L", n: 12, count: 250, label: "12×12" },
-  { key: "XL", n: 15, count: 150, label: "15×15" }
+  { key: "S", n: 5, count: 250, label: "5×5" },
+  { key: "M", n: 10, count: 250, label: "10×10" },
+  { key: "L", n: 15, count: 250, label: "15×15" },
+  { key: "XL", n: 20, count: 150, label: "20×20" },
+  { key: "XXL", n: 25, count: 100, label: "25×25" }
 ];
 function tierByKey(k) {
   for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === k) return TIERS[i];
@@ -599,6 +637,7 @@ var cellEls = [];
 var rowClueEls = [];
 var colClueEls = [];
 var timerHandle = null;
+var reviewing = false;
 
 /* ---------- 乱数（シード固定＝同じ番号なら毎回同じ問題） ---------- */
 function mulberry32(a) {
@@ -681,23 +720,24 @@ function buildLevelPuzzle(tierKey, idx) {
 
 function newGameStateFromPuzzle(puzzle) {
   var cells = [];
-  var remaining = 0;
+  var target = 0;
   for (var r = 0; r < puzzle.n; r++) {
     var row = [];
     for (var c = 0; c < puzzle.n; c++) {
       row.push(0);
-      if (puzzle.solution[r][c]) remaining++;
+      if (puzzle.solution[r][c]) target++;
     }
     cells.push(row);
   }
-  return { puzzle: puzzle, cells: cells, remaining: remaining, mistakes: 0, hints: 0, elapsed: 0, solved: false, history: [] };
+  return { puzzle: puzzle, cells: cells, target: target, hints: 0, elapsed: 0, solved: false, history: [] };
 }
 
 function sizeForMode(sizeMode, streak) {
-  if (sizeMode === "auto") return Math.min(15, 5 + Math.floor(streak / 2));
-  if (sizeMode === "M") return 8;
-  if (sizeMode === "L") return 12;
-  if (sizeMode === "XL") return 15;
+  if (sizeMode === "auto") return Math.min(25, 5 + Math.floor(streak / 3) * 5);
+  if (sizeMode === "M") return 10;
+  if (sizeMode === "L") return 15;
+  if (sizeMode === "XL") return 20;
+  if (sizeMode === "XXL") return 25;
   return 5;
 }
 
@@ -726,7 +766,7 @@ function load() {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       var parsed = JSON.parse(raw);
-      if (parsed && parsed.endless && parsed.endless.game && parsed.levels && parsed.levels.current) {
+      if (parsed && parsed.endless && parsed.endless.game && parsed.levels && parsed.levels.current && parsed.levels.current.XXL) {
         state = parsed;
         return;
       }
@@ -755,10 +795,10 @@ function fmtTime(s) {
 }
 function cellSizeFor(n) {
   if (n <= 5) return 52;
-  if (n <= 8) return 44;
-  if (n <= 11) return 38;
+  if (n <= 10) return 42;
   if (n <= 15) return 32;
-  return 26;
+  if (n <= 20) return 26;
+  return 20;
 }
 
 /* 盤面全体（ヒント列込み）が画面の幅・高さに収まるようマスの大きさを自動調整 */
@@ -768,15 +808,19 @@ function fitBoard() {
   var n = currentGame().puzzle.n;
   var cell = cellSizeFor(n);
   board.style.setProperty("--cell", cell + "px");
-  for (var i = 0; i < 6; i++) {
+  for (var i = 0; i < 8; i++) {
     var overW = board.scrollWidth - scroll.clientWidth;
     var overH = board.scrollHeight - scroll.clientHeight;
     var over = Math.max(overW, overH);
-    if (over <= 0 || cell <= 15) break;
-    cell = Math.max(15, cell - Math.ceil(over / n));
+    if (over <= 0 || cell <= 12) break;
+    cell = Math.max(12, cell - Math.ceil(over / n));
     board.style.setProperty("--cell", cell + "px");
   }
+  // それでも収まらない場合のみスクロール可能に（ドラッグ塗りよりスクロールを優先）
+  var still = (board.scrollWidth > scroll.clientWidth) || (board.scrollHeight > scroll.clientHeight);
+  board.classList.toggle("scrollable", still);
 }
+
 function applyTheme() {
   document.body.classList.toggle("light", state.theme === "light");
   $("themeColorMeta").setAttribute("content", state.theme === "light" ? "#eef0fa" : "#12142a");
@@ -786,11 +830,10 @@ function applyTheme() {
 
 /* ---------- 盤面描画 ---------- */
 function applyCellVisual(el, val) {
-  el.classList.remove("filled", "wrong");
+  el.classList.remove("filled");
   el.textContent = "";
   if (val === 1) el.classList.add("filled");
   else if (val === 2) el.textContent = "✕";
-  else if (val === 3) { el.classList.add("wrong"); el.textContent = "✕"; }
 }
 
 function renderBoard() {
@@ -798,6 +841,7 @@ function renderBoard() {
   var n = g.puzzle.n;
   var board = $("board");
   board.innerHTML = "";
+  board.classList.remove("scrollable");
   board.style.setProperty("--cell", cellSizeFor(n) + "px");
   board.style.gridTemplateColumns = "max-content repeat(" + n + ", var(--cell))";
   board.style.gridTemplateRows = "max-content repeat(" + n + ", var(--cell))";
@@ -805,6 +849,8 @@ function renderBoard() {
   cellEls = [];
   rowClueEls = [];
   colClueEls = [];
+  reviewing = false;
+  $("reviewBar").classList.remove("show");
 
   var corner = document.createElement("div");
   corner.className = "corner";
@@ -847,24 +893,51 @@ function renderBoard() {
   fitBoard();
 }
 
-function rowComplete(r) {
+/* ---------- ヒント数字の達成判定（自分の塗りが数字パターンと一致しているか） ---------- */
+function runsOfRow(r) {
   var g = currentGame(), n = g.puzzle.n;
-  for (var c = 0; c < n; c++) if (g.puzzle.solution[r][c] !== (g.cells[r][c] === 1)) return false;
+  var res = [], run = 0;
+  for (var c = 0; c < n; c++) {
+    if (g.cells[r][c] === 1) run++;
+    else if (run > 0) { res.push(run); run = 0; }
+  }
+  if (run > 0) res.push(run);
+  if (!res.length) res.push(0);
+  return res;
+}
+function runsOfCol(c) {
+  var g = currentGame(), n = g.puzzle.n;
+  var res = [], run = 0;
+  for (var r = 0; r < n; r++) {
+    if (g.cells[r][c] === 1) run++;
+    else if (run > 0) { res.push(run); run = 0; }
+  }
+  if (run > 0) res.push(run);
+  if (!res.length) res.push(0);
+  return res;
+}
+function sameRuns(a, b) {
+  if (a.length !== b.length) return false;
+  for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
   return true;
 }
-function colComplete(c) {
-  var g = currentGame(), n = g.puzzle.n;
-  for (var r = 0; r < n; r++) if (g.puzzle.solution[r][c] !== (g.cells[r][c] === 1)) return false;
-  return true;
-}
+function rowSatisfied(r) { return sameRuns(runsOfRow(r), currentGame().puzzle.rowClues[r]); }
+function colSatisfied(c) { return sameRuns(runsOfCol(c), currentGame().puzzle.colClues[c]); }
+
 function updateClueStatus(r, c) {
-  rowClueEls[r].classList.toggle("done", rowComplete(r));
-  colClueEls[c].classList.toggle("done", colComplete(c));
+  rowClueEls[r].classList.toggle("done", rowSatisfied(r));
+  colClueEls[c].classList.toggle("done", colSatisfied(c));
 }
 function updateAllClueStatus() {
   var n = currentGame().puzzle.n;
-  for (var r = 0; r < n; r++) rowClueEls[r].classList.toggle("done", rowComplete(r));
-  for (var c = 0; c < n; c++) colClueEls[c].classList.toggle("done", colComplete(c));
+  for (var r = 0; r < n; r++) rowClueEls[r].classList.toggle("done", rowSatisfied(r));
+  for (var c = 0; c < n; c++) colClueEls[c].classList.toggle("done", colSatisfied(c));
+}
+function allSatisfied() {
+  var n = currentGame().puzzle.n;
+  for (var r = 0; r < n; r++) if (!rowSatisfied(r)) return false;
+  for (var c = 0; c < n; c++) if (!colSatisfied(c)) return false;
+  return true;
 }
 
 /* ---------- マス操作（タップ／ドラッグで連続ペイント） ---------- */
@@ -878,52 +951,56 @@ function hasProgressIn(g) {
 }
 function hasProgress() { return hasProgressIn(currentGame()); }
 
+function fillCount() {
+  var g = currentGame(), n = g.puzzle.n, cnt = 0;
+  for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (g.cells[r][c] === 1) cnt++;
+  return cnt;
+}
+
 function determineDragAction(cur) {
-  if (mode === "fill") return (cur === 1 || cur === 3) ? "erase" : "fill";
+  if (mode === "fill") return (cur === 1) ? "erase" : "fill";
   return (cur === 2) ? "unmark" : "mark";
 }
 
-function countRemainingIn(g) {
-  var n = g.puzzle.n, cnt = 0;
-  for (var r = 0; r < n; r++) {
-    for (var c = 0; c < n; c++) {
-      if (g.puzzle.solution[r][c] && g.cells[r][c] !== 1) cnt++;
-    }
+function setCell(r, c, val, group) {
+  var g = currentGame();
+  group.push({ r: r, c: c, prev: g.cells[r][c] });
+  g.cells[r][c] = val;
+  applyCellVisual(cellEls[r][c], val);
+}
+
+/* 数字パターンを満たした行・列の残りマスへ自動で✕を付ける */
+function autoCrossLine(r, c, group) {
+  var g = currentGame(), n = g.puzzle.n, i;
+  if (rowSatisfied(r)) {
+    for (i = 0; i < n; i++) if (g.cells[r][i] === 0) setCell(r, i, 2, group);
   }
-  return cnt;
+  if (colSatisfied(c)) {
+    for (i = 0; i < n; i++) if (g.cells[i][c] === 0) setCell(i, c, 2, group);
+  }
 }
 
 function applyDragAction(r, c, action) {
   var g = currentGame();
   if (g.solved) return;
   var cur = g.cells[r][c];
-  var sol = g.puzzle.solution[r][c];
   var next = null;
-  if (action === "fill") {
-    if (cur !== 0) return;
-    next = sol ? 1 : 3;
-  } else if (action === "erase") {
-    if (cur !== 1 && cur !== 3) return;
-    next = 0;
-  } else if (action === "mark") {
-    if (cur !== 0) return;
-    next = 2;
-  } else if (action === "unmark") {
-    if (cur !== 2) return;
-    next = 0;
-  }
+  if (action === "fill") { if (cur !== 0) return; next = 1; }
+  else if (action === "erase") { if (cur !== 1) return; next = 0; }
+  else if (action === "mark") { if (cur !== 0) return; next = 2; }
+  else if (action === "unmark") { if (cur !== 2) return; next = 0; }
   if (next === null) return;
-  g.history.push({ r: r, c: c, prev: cur });
-  if (g.history.length > 400) g.history.shift();
-  if (cur === 1 && next !== 1) g.remaining++;
-  if (next === 1) g.remaining--;
-  if (action === "fill" && next === 3) { g.mistakes++; vibrate(15); }
-  g.cells[r][c] = next;
-  applyCellVisual(cellEls[r][c], next);
+
+  var group = [];
+  setCell(r, c, next, group);
+  if (next === 1) autoCrossLine(r, c, group);
+  g.history.push(group);
+  if (g.history.length > 500) g.history.shift();
+
   updateClueStatus(r, c);
   updateStatsUI();
   save();
-  if (g.remaining <= 0) onSolved();
+  if (next === 1 && allSatisfied()) onSolved();
 }
 
 var painting = false, paintAction = null, lastPaintedKey = null;
@@ -978,11 +1055,13 @@ function docPointerUp() {
 function undo() {
   var g = currentGame();
   if (g.solved || !g.history.length) return;
-  var last = g.history.pop();
-  g.cells[last.r][last.c] = last.prev;
-  applyCellVisual(cellEls[last.r][last.c], last.prev);
-  updateClueStatus(last.r, last.c);
-  g.remaining = countRemainingIn(g);
+  var group = g.history.pop();
+  for (var i = group.length - 1; i >= 0; i--) {
+    var s = group[i];
+    g.cells[s.r][s.c] = s.prev;
+    applyCellVisual(cellEls[s.r][s.c], s.prev);
+  }
+  updateAllClueStatus();
   updateStatsUI();
   save();
 }
@@ -997,21 +1076,35 @@ function hint() {
       if (g.puzzle.solution[r][c] && g.cells[r][c] !== 1) candidates.push([r, c]);
     }
   }
-  if (!candidates.length) return;
+  if (!candidates.length) { toast("お手本の塗りマスはすべて塗られています"); return; }
   var pick = candidates[Math.floor(Math.random() * candidates.length)];
   var r = pick[0], c = pick[1];
-  g.history.push({ r: r, c: c, prev: g.cells[r][c] });
-  g.cells[r][c] = 1;
-  g.remaining--;
+  var group = [];
+  setCell(r, c, 1, group);
+  autoCrossLine(r, c, group);
+  g.history.push(group);
   g.hints = (g.hints || 0) + 1;
-  applyCellVisual(cellEls[r][c], 1);
   updateClueStatus(r, c);
   updateStatsUI();
   save();
-  if (g.remaining <= 0) onSolved();
+  if (allSatisfied()) onSolved();
 }
 
-/* ---------- クリア処理 ---------- */
+/* ---------- クリア処理・答え合わせ ---------- */
+function computeDiff() {
+  var g = currentGame(), n = g.puzzle.n;
+  var wrong = [], missed = [];
+  for (var r = 0; r < n; r++) {
+    for (var c = 0; c < n; c++) {
+      var filled = g.cells[r][c] === 1;
+      var sol = g.puzzle.solution[r][c];
+      if (filled && !sol) wrong.push([r, c]);
+      else if (!filled && sol) missed.push([r, c]);
+    }
+  }
+  return { wrong: wrong, missed: missed };
+}
+
 function tierClearedCount(tierKey) {
   var n = 0, prefix = tierKey + "-";
   for (var k in state.levels.cleared) if (k.indexOf(prefix) === 0) n++;
@@ -1026,6 +1119,7 @@ function totalClearedCount() {
 function onSolved() {
   var g = currentGame();
   g.solved = true;
+  vibrate(60);
   if (state.mode === "endless") {
     state.endless.streak++;
     state.endless.totalCleared++;
@@ -1036,12 +1130,63 @@ function onSolved() {
     var key = tier + "-" + idx;
     var prev = state.levels.cleared[key];
     if (!prev || g.elapsed < prev.time) {
-      state.levels.cleared[key] = { time: g.elapsed, mistakes: g.mistakes, clearedAt: Date.now() };
+      state.levels.cleared[key] = { time: g.elapsed, clearedAt: Date.now() };
     }
   }
   save();
   updateStatsUI();
   showWinOverlay();
+}
+
+function showReview() {
+  var g = currentGame();
+  if (!g.solved) return;
+  reviewing = true;
+  var diff = computeDiff();
+  var i;
+  for (i = 0; i < diff.wrong.length; i++) {
+    cellEls[diff.wrong[i][0]][diff.wrong[i][1]].classList.add("rv-wrong");
+  }
+  for (i = 0; i < diff.missed.length; i++) {
+    cellEls[diff.missed[i][0]][diff.missed[i][1]].classList.add("rv-missed");
+  }
+  var text;
+  if (!diff.wrong.length && !diff.missed.length) {
+    text = "🎯 お手本の絵と完全一致！おみごとです。";
+  } else {
+    text = 'お手本と違うマス：<span class="legend" style="background:var(--wrong-bg)"></span>余分に塗ったマス（' + diff.wrong.length + '）　' +
+           '<span class="legend" style="background:var(--missed-bg)"></span>お手本では塗るマス（' + diff.missed.length + '）<br>' +
+           '数字はすべて満たしているので、別解での正解クリアです。';
+  }
+  $("reviewText").innerHTML = text;
+  $("reviewBar").classList.add("show");
+}
+
+function goNext() {
+  $("winModal").classList.remove("open");
+  $("reviewBar").classList.remove("show");
+  reviewing = false;
+  if (state.mode === "endless") {
+    startNewEndlessPuzzle(false);
+    return;
+  }
+  var tier = state.levels.tier;
+  var t = tierByKey(tier);
+  var nextIdx = state.levels.current[tier].idx + 1;
+  if (nextIdx > t.count) {
+    var tIdx = -1;
+    for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === tier) tIdx = i;
+    if (tIdx > -1 && tIdx < TIERS.length - 1) {
+      var nextTier = TIERS[tIdx + 1];
+      toast(t.label + "を全てクリアしました！次は" + nextTier.label + "に挑戦");
+      goToLevel(nextTier.key, state.levels.current[nextTier.key].idx, { force: true });
+    } else {
+      toast("全1000レベルクリア！お見事です🎉");
+      openLevelList(tier);
+    }
+    return;
+  }
+  goToLevel(tier, nextIdx, { force: true });
 }
 
 function startNewEndlessPuzzle(resetStreak) {
@@ -1100,7 +1245,7 @@ function updateTierSegActive() {
 function updateStatsUI() {
   var g = currentGame();
   $("statSize").textContent = g.puzzle.n + "×" + g.puzzle.n;
-  $("statMistakes").textContent = g.mistakes;
+  $("statFill").textContent = fillCount() + "/" + g.target;
   $("statTime").textContent = fmtTime(g.elapsed);
   if (state.mode === "endless") {
     $("statStreakLabel").textContent = "連続";
@@ -1122,8 +1267,11 @@ function updateStatsUI() {
 
 function showWinOverlay() {
   var g = currentGame();
+  var diff = computeDiff();
+  var d = diff.wrong.length + diff.missed.length;
   $("winTime").textContent = fmtTime(g.elapsed);
-  $("winMistakes").textContent = g.mistakes;
+  $("winDiff").textContent = d;
+  $("winNote").textContent = d === 0 ? "お手本の絵と完全一致です！" : "数字をすべて満たしました（別解クリア）";
   if (state.mode === "endless") {
     $("winStreakLabel").textContent = "連続クリア";
     $("winStreak").textContent = state.endless.streak;
@@ -1209,6 +1357,7 @@ document.addEventListener("DOMContentLoaded", function () {
   renderBoard();
   updateStatsUI();
   startTimer();
+  if (currentGame().solved) showWinOverlay();
 
   $("board").addEventListener("pointerdown", boardPointerDown, { passive: false });
   document.addEventListener("pointermove", docPointerMove, { passive: false });
@@ -1247,6 +1396,7 @@ document.addEventListener("DOMContentLoaded", function () {
       save();
       renderBoard();
       updateStatsUI();
+      if (currentGame().solved) showWinOverlay();
     });
   });
   document.querySelectorAll("#tierSegModal .tier-btn").forEach(function (btn) {
@@ -1297,32 +1447,18 @@ document.addEventListener("DOMContentLoaded", function () {
     toast("リセットしました");
   });
 
-  $("btnNext").addEventListener("click", function () {
+  $("btnReview").addEventListener("click", function () {
     $("winModal").classList.remove("open");
-    if (state.mode === "endless") {
-      startNewEndlessPuzzle(false);
-      return;
-    }
-    var tier = state.levels.tier;
-    var t = tierByKey(tier);
-    var nextIdx = state.levels.current[tier].idx + 1;
-    if (nextIdx > t.count) {
-      var tIdx = -1;
-      for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === tier) tIdx = i;
-      if (tIdx > -1 && tIdx < TIERS.length - 1) {
-        var nextTier = TIERS[tIdx + 1];
-        toast(t.label + "を全てクリアしました！次は" + nextTier.label + "に挑戦");
-        goToLevel(nextTier.key, state.levels.current[nextTier.key].idx, { force: true });
-      } else {
-        toast("全1000レベルクリア！お見事です🎉");
-        openLevelList(tier);
-      }
-      return;
-    }
-    goToLevel(tier, nextIdx, { force: true });
+    showReview();
   });
+  $("btnNext").addEventListener("click", goNext);
+  $("btnNextFromReview").addEventListener("click", goNext);
   $("winModal").addEventListener("click", function (e) {
-    if (e.target === this) { this.classList.remove("open"); }
+    if (e.target === this) {
+      // 背景タップで閉じたときは答え合わせを表示
+      this.classList.remove("open");
+      showReview();
+    }
   });
 
   if ("serviceWorker" in navigator && location.protocol === "https:") {
