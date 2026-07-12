@@ -425,28 +425,31 @@ body.light .zoom-btns button { background: rgba(255, 255, 255, 0.9); }
 }
 .bottombar button:active { transform: scale(.96); }
 
-/* 十字キー操作パネル */
+/* 十字キー操作パネル（十字キーモードでは下部バーの代わりにこれを表示） */
 .dpad-panel {
   flex-shrink: 0;
   display: none;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 8px 16px 2px;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px 12px calc(10px + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--border);
 }
 .dpad-panel.show { display: flex; }
+body.dpad-mode .bottombar { display: none; }
 .dpad {
   display: grid;
-  grid-template-columns: repeat(3, 52px);
-  grid-template-rows: repeat(3, 44px);
-  gap: 4px;
+  grid-template-columns: repeat(3, 54px);
+  grid-template-rows: repeat(3, 47px);
+  gap: 5px;
+  flex-shrink: 0;
 }
 .d-btn {
   border: 1.5px solid var(--border);
   background: var(--card2);
   color: var(--text);
-  border-radius: 10px;
-  font-size: 15px;
+  border-radius: 12px;
+  font-size: 16px;
   font-family: inherit;
   cursor: pointer;
   -webkit-user-select: none;
@@ -458,22 +461,74 @@ body.light .zoom-btns button { background: rgba(255, 255, 255, 0.9); }
 .d-left { grid-column: 1; grid-row: 2; }
 .d-right { grid-column: 3; grid-row: 2; }
 .d-down { grid-column: 2; grid-row: 3; }
-.dpad-action {
+.dpad-actions {
   flex: 1;
-  height: 96px;
-  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+.dpad-actions button {
   border: none;
-  background: var(--primary);
-  color: #fff;
-  font-size: 17px;
-  font-weight: 800;
+  border-radius: 14px;
   font-family: inherit;
+  font-weight: 800;
   cursor: pointer;
   -webkit-user-select: none;
   user-select: none;
-  touch-action: manipulation;
+  touch-action: none;
 }
-.dpad-action:active { transform: scale(.97); background: var(--primary-dark); }
+.dpad-fill {
+  flex: 1.35;
+  background: var(--primary);
+  color: #fff;
+  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.dpad-fill small { font-size: 9.5px; font-weight: 600; opacity: .85; }
+.dpad-fill:active, .dpad-fill.holding { background: var(--primary-dark); }
+.dpad-mark { flex: 1; background: var(--card2); color: var(--text); border: 1.5px solid var(--border) !important; font-size: 14px; }
+.dpad-mark:active, .dpad-mark.holding { background: var(--primary); color: #fff; }
+.dpad-side {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 52px;
+  flex-shrink: 0;
+}
+.dpad-side button {
+  flex: 1;
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  background: var(--card2);
+  color: var(--text);
+  font-size: 17px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.dpad-side button:active { transform: scale(.95); }
+.dpad-hold-hint {
+  position: absolute;
+  left: 12px;
+  top: -22px;
+  font-size: 10.5px;
+  color: var(--text-sub);
+  font-weight: 600;
+}
+
+/* 広告枠（AD_CLIENT設定時のみ表示） */
+.ad-bar {
+  flex-shrink: 0;
+  display: none;
+  max-height: 64px;
+  overflow: hidden;
+  background: var(--bg);
+  text-align: center;
+}
 
 /* 答え合わせバー */
 .review-bar {
@@ -721,6 +776,8 @@ body.light .zoom-btns button { background: rgba(255, 255, 255, 0.9); }
     </div>
   </div>
 
+  <div class="ad-bar" id="adBar"></div>
+
   <div class="dpad-panel" id="dpadPanel">
     <div class="dpad">
       <button type="button" class="d-btn d-up" data-dir="up">▲</button>
@@ -728,7 +785,15 @@ body.light .zoom-btns button { background: rgba(255, 255, 255, 0.9); }
       <button type="button" class="d-btn d-right" data-dir="right">▶</button>
       <button type="button" class="d-btn d-down" data-dir="down">▼</button>
     </div>
-    <button type="button" class="dpad-action" id="dpadAction">🖊 塗る</button>
+    <div class="dpad-actions">
+      <button type="button" class="dpad-fill" id="dpadFill">🖊 塗る<small>押しながら移動で連続塗り</small></button>
+      <button type="button" class="dpad-mark" id="dpadMark">✕ 印</button>
+    </div>
+    <div class="dpad-side">
+      <button type="button" id="dpadUndo" title="元に戻す">↺</button>
+      <button type="button" id="dpadHint" title="ヒント">💡</button>
+      <button type="button" id="btnToTouch" title="手塗りに切替">👆</button>
+    </div>
   </div>
 
   <div class="bottombar">
@@ -736,6 +801,7 @@ body.light .zoom-btns button { background: rgba(255, 255, 255, 0.9); }
     <button class="mode-btn" id="modeMarkBtn">✕<span>印</span></button>
     <button class="icon-btn-lg" id="btnUndo" title="元に戻す">↺</button>
     <button class="icon-btn-lg" id="btnHint" title="ヒント">💡</button>
+    <button class="icon-btn-lg" id="btnToDpad" title="十字キーに切替">🎮</button>
   </div>
 </div>
 
@@ -816,7 +882,7 @@ body.light .zoom-btns button { background: rgba(255, 255, 255, 0.9); }
         <div class="card-title">遊び方</div>
         <p class="howto">
           数字は、その行・列で連続して塗るマスの数を表します。数字が複数ある場合は、書かれた順番どおりに並び、数字と数字の間には必ず1マス以上の空白が入ります。すべての行と列の数字を満たすように塗ると、絵が完成します。<br><br>
-          塗り方は2種類から選べます。「手塗り」はマスの上を指でなぞって直接塗る方式、「十字キー」は方向ボタンでカーソルを動かして大きなボタンで塗る方式です（細かいマスでも正確に塗れます）。「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。行や列が数字の通りに塗り終わると、残りのマスに自動で✕が付きます。<br><br>
+          塗り方は2種類から選べます（画面下の 🎮／👆 ボタンでいつでも切替可能）。「手塗り」はマスの上を指でなぞって直接塗る方式です。「十字キー」は方向ボタンでカーソルを動かし「塗る」「印」ボタンで塗る方式で、<b>ボタンを押したまま十字キーを動かすと通ったマスを連続で塗れます</b>（ゲーム機のピクロスと同じ操作感。細かいマスでも正確に塗れます）。行や列が数字の通りに塗り終わると、残りのマスに自動で✕が付きます。<br><br>
           盤面右下の「＋／−」ボタンか、2本指のピンチ操作で盤面を拡大・縮小できます（⛶で全体表示に戻ります）。盤面が画面に収まらないときは、下と右のスクロールバーで移動できます。<br><br>
           すべての行と列の数字を満たすとクリアです。クリア後に「答え合わせ」で、お手本の絵との違いを確認できます。<br><br>
           「レベル」では6段階の難易度で計1050問を用意（難易度が上がるほど問題数が増えます）。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードで、🏆からオンラインランキングに参加できます（Googleログイン・任意）。
@@ -1199,6 +1265,7 @@ function renderBoard() {
   cursorR = 0;
   cursorC = 0;
   renderCursor();
+  if (g.solved) showSolvedArt(); // クリア済みの盤面は完成した絵として表示
 }
 
 /* ---------- ヒント数字の達成判定（自分の塗りが数字パターンと一致しているか） ---------- */
@@ -1409,18 +1476,33 @@ function docPointerUpPinch(e) {
 
 /* ---------- 十字キー操作 ---------- */
 var cursorR = 0, cursorC = 0;
+var heldDpadAction = null; // 塗る/印ボタンを押している間の連続ペイント用
 
 function applyInputMethod() {
   var dpad = state.inputMethod === "dpad";
+  document.body.classList.toggle("dpad-mode", dpad);
   $("dpadPanel").classList.toggle("show", dpad);
   $("inputTouchBtn").classList.toggle("on", !dpad);
   $("inputDpadBtn").classList.toggle("on", dpad);
   $("inputMethodHint").textContent = dpad
-    ? "十字キーでカーソルを動かし、大きいボタンで塗ります。マスをタップするとカーソルがそこへ移動します。"
+    ? "十字キーでカーソルを動かし、「塗る」「印」ボタンで塗ります。ボタンを押したまま十字キーを動かすと連続で塗れます。マスをタップするとカーソルがそこへ移動します。"
     : "マスを指でなぞって直接塗ります。";
+  heldDpadAction = null;
   renderCursor();
   // パネルの表示/非表示で盤面の高さが変わるため再フィット
   setTimeout(fitBoard, 30);
+}
+
+/* 塗る/印ボタンを押した瞬間の動作を決め、カーソル位置に適用する。
+   押しっぱなしの間は moveCursor がこの動作を引き継いで連続ペイントする */
+function dpadPress(kind) {
+  var g = currentGame();
+  if (g.solved) return null;
+  var cur = g.cells[cursorR][cursorC];
+  var action = kind === "fill" ? (cur === 1 ? "erase" : "fill") : (cur === 2 ? "unmark" : "mark");
+  applyDragAction(cursorR, cursorC, action);
+  vibrate(10);
+  return action;
 }
 
 /* カーソルのマスが見える位置までマス目ペインをスクロール */
@@ -1455,17 +1537,8 @@ function moveCursor(dir) {
   else if (dir === "left") cursorC--;
   else if (dir === "right") cursorC++;
   renderCursor();
-}
-
-function dpadAct() {
-  var g = currentGame();
-  if (g.solved) return;
-  var action = determineDragAction(g.cells[cursorR][cursorC]);
-  applyDragAction(cursorR, cursorC, action);
-}
-
-function updateDpadActionLabel() {
-  $("dpadAction").textContent = mode === "fill" ? "🖊 塗る" : "✕ 印";
+  // ボタンを押したまま移動 → 通ったマスを連続ペイント（本家ピクロス方式）
+  if (heldDpadAction) applyDragAction(cursorR, cursorC, heldDpadAction);
 }
 
 function undo() {
@@ -1532,10 +1605,26 @@ function totalClearedCount() {
   return n;
 }
 
+/* クリア時：✕印とカーソルを消して完成した絵だけを見せ、全体表示に戻す */
+function showSolvedArt() {
+  var g = currentGame();
+  var n = g.puzzle.n;
+  for (var r = 0; r < n; r++) {
+    for (var c = 0; c < n; c++) {
+      if (g.cells[r][c] === 2) cellEls[r][c].textContent = "";
+    }
+  }
+  var cur = document.querySelector(".cell.cursor");
+  if (cur) cur.classList.remove("cursor");
+  zoomFactor = 1;
+  fitBoard();
+}
+
 function onSolved() {
   var g = currentGame();
   g.solved = true;
   vibrate(60);
+  showSolvedArt();
   if (state.mode === "endless") {
     state.endless.streak++;
     state.endless.totalCleared++;
@@ -1647,12 +1736,40 @@ function confirmAbandonIfNeeded() {
 function startTimer() {
   if (timerHandle) return;
   timerHandle = setInterval(function () {
+    if (document.hidden) return; // アプリを閉じている間はタイムを進めない
     var g = currentGame();
     if (g.solved) return;
     g.elapsed++;
     $("statTime").textContent = fmtTime(g.elapsed);
     if (g.elapsed % 5 === 0) save();
   }, 1000);
+}
+
+/* ---------- 広告（AdSense）----------
+   広告を有効にするには、AdSenseで取得したパブリッシャーIDと広告ユニットIDを
+   下の2つの定数に設定してください。未設定の間、広告枠は表示されません。 */
+var AD_CLIENT = "";  // 例: "ca-pub-1234567890123456"
+var AD_SLOT = "";    // 例: "1234567890"
+
+function initAds() {
+  if (!AD_CLIENT || !AD_SLOT) return;
+  var bar = $("adBar");
+  bar.style.display = "block";
+  bar.innerHTML =
+    '<ins class="adsbygoogle" style="display:block;height:60px"' +
+    ' data-ad-client="' + AD_CLIENT + '" data-ad-slot="' + AD_SLOT + '"' +
+    ' data-ad-format="horizontal" data-full-width-responsive="false"></ins>';
+  var s = document.createElement("script");
+  s.async = true;
+  s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + AD_CLIENT;
+  s.crossOrigin = "anonymous";
+  s.onload = function () {
+    try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {}
+  };
+  s.onerror = function () { bar.style.display = "none"; };
+  document.head.appendChild(s);
+  // 広告枠の分だけ盤面の高さが変わるため再フィット
+  setTimeout(fitBoard, 400);
 }
 
 /* ---------- HUD ---------- */
@@ -1976,16 +2093,20 @@ function setAppMode(m) {
 
 /* ---------- イベント登録 ---------- */
 document.addEventListener("DOMContentLoaded", function () {
+  var isFirstLaunch = !localStorage.getItem(STORAGE_KEY);
   load();
   applyTheme();
   setAppMode(state.mode);
   applyInputMethod();
-  updateDpadActionLabel();
   renderBoard();
   updateStatsUI();
   startTimer();
   initFirebase();
+  initAds();
   if (currentGame().solved) showWinOverlay();
+  if (isFirstLaunch) {
+    setTimeout(function () { toast("ようこそ！遊び方は右上の ⚙️ から確認できます"); }, 600);
+  }
 
   var view = $("cellsView");
   $("board").addEventListener("pointerdown", boardPointerDown, { passive: false });
@@ -2020,26 +2141,80 @@ document.addEventListener("DOMContentLoaded", function () {
   $("zoomOut").addEventListener("click", function () { zoomBy(0.8); });
   $("zoomFit").addEventListener("click", function () { zoomFactor = 1; fitBoard(); });
 
-  // 十字キー（押しっぱなしで連続移動）
-  var dpadTimer = null;
+  // 十字キー（押しっぱなしで高速連続移動：250ms後に80ms間隔）
+  var dpadDelay = null, dpadTimer = null;
+  function stopDpadRepeat() {
+    clearTimeout(dpadDelay);
+    clearInterval(dpadTimer);
+    dpadDelay = null;
+    dpadTimer = null;
+  }
   document.querySelectorAll(".d-btn").forEach(function (btn) {
     var dir = btn.dataset.dir;
     function start(e) {
       e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (err) {}
       moveCursor(dir);
-      clearInterval(dpadTimer);
-      var started = Date.now();
-      dpadTimer = setInterval(function () {
-        if (Date.now() - started > 320) moveCursor(dir);
-      }, 110);
+      stopDpadRepeat();
+      dpadDelay = setTimeout(function () {
+        dpadTimer = setInterval(function () { moveCursor(dir); }, 80);
+      }, 250);
     }
-    function stop() { clearInterval(dpadTimer); }
     btn.addEventListener("pointerdown", start);
-    btn.addEventListener("pointerup", stop);
-    btn.addEventListener("pointercancel", stop);
-    btn.addEventListener("pointerleave", stop);
+    btn.addEventListener("pointerup", stopDpadRepeat);
+    btn.addEventListener("pointercancel", stopDpadRepeat);
   });
-  $("dpadAction").addEventListener("click", dpadAct);
+
+  // 塗る/印ボタン：押した瞬間に1マス塗り、押している間は移動で連続ペイント
+  [["dpadFill", "fill"], ["dpadMark", "mark"]].forEach(function (pair) {
+    var btn = $(pair[0]);
+    function press(e) {
+      e.preventDefault();
+      try { btn.setPointerCapture(e.pointerId); } catch (err) {}
+      heldDpadAction = dpadPress(pair[1]);
+      btn.classList.add("holding");
+    }
+    function release() {
+      heldDpadAction = null;
+      btn.classList.remove("holding");
+    }
+    btn.addEventListener("pointerdown", press);
+    btn.addEventListener("pointerup", release);
+    btn.addEventListener("pointercancel", release);
+  });
+
+  $("dpadUndo").addEventListener("click", undo);
+  $("dpadHint").addEventListener("click", hint);
+  $("btnToTouch").addEventListener("click", function () {
+    state.inputMethod = "touch";
+    save();
+    applyInputMethod();
+    toast("手塗りモードに切り替えました");
+  });
+  $("btnToDpad").addEventListener("click", function () {
+    state.inputMethod = "dpad";
+    save();
+    applyInputMethod();
+    toast("十字キーモードに切り替えました");
+  });
+
+  // 物理キーボード（矢印＝移動、スペース/Enter＝塗る、X＝印、Z＝戻す）
+  document.addEventListener("keydown", function (e) {
+    if (state.inputMethod !== "dpad") return;
+    if (e.target && (e.target.tagName === "INPUT" || e.target.tagName === "SELECT" || e.target.tagName === "TEXTAREA")) return;
+    var k = e.key;
+    if (k === "ArrowUp") { moveCursor("up"); e.preventDefault(); }
+    else if (k === "ArrowDown") { moveCursor("down"); e.preventDefault(); }
+    else if (k === "ArrowLeft") { moveCursor("left"); e.preventDefault(); }
+    else if (k === "ArrowRight") { moveCursor("right"); e.preventDefault(); }
+    else if ((k === " " || k === "Enter") && !e.repeat) { heldDpadAction = dpadPress("fill"); e.preventDefault(); }
+    else if ((k === "x" || k === "X") && !e.repeat) { heldDpadAction = dpadPress("mark"); e.preventDefault(); }
+    else if ((k === "z" || k === "Z") && !e.repeat) { undo(); }
+  });
+  document.addEventListener("keyup", function (e) {
+    var k = e.key;
+    if (k === " " || k === "Enter" || k === "x" || k === "X") heldDpadAction = null;
+  });
 
   $("inputTouchBtn").addEventListener("click", function () {
     state.inputMethod = "touch";
@@ -2056,13 +2231,11 @@ document.addEventListener("DOMContentLoaded", function () {
     mode = "fill";
     $("modeFillBtn").classList.add("on");
     $("modeMarkBtn").classList.remove("on");
-    updateDpadActionLabel();
   });
   $("modeMarkBtn").addEventListener("click", function () {
     mode = "mark";
     $("modeMarkBtn").classList.add("on");
     $("modeFillBtn").classList.remove("on");
-    updateDpadActionLabel();
   });
 
   $("btnUndo").addEventListener("click", undo);
