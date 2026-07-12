@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#12142a" id="themeColorMeta">
-<meta name="description" content="1000問のレベルと無限に遊べるエンドレスモードを収録したお絵かきロジック（ノノグラム）パズルゲーム">
+<meta name="description" content="1050問のレベルと無限に遊べるエンドレスモードを収録したお絵かきロジック（ノノグラム）パズルゲーム">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
@@ -151,10 +151,14 @@ body {
   padding: 0 10px;
   appearance: none;
 }
-.tier-seg { display: flex; gap: 5px; flex: 1; }
-.tier-btn {
+.tier-seg {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
   flex: 1;
-  height: 42px;
+}
+.tier-btn {
+  height: 34px;
   border: 1.5px solid var(--border);
   background: var(--card);
   color: var(--text);
@@ -166,6 +170,27 @@ body {
   padding: 0 2px;
 }
 .tier-btn.on { border-color: var(--primary); background: var(--primary); color: #fff; }
+
+/* ランキング */
+.rank-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.rank-row .no { width: 34px; font-weight: 800; font-size: 15px; color: var(--text-sub); font-variant-numeric: tabular-nums; }
+.rank-row.top1 .no { color: var(--gold); }
+.rank-row.top2 .no { color: #b9bed6; }
+.rank-row.top3 .no { color: #d29a6a; }
+.rank-row .label { flex: 1; font-size: 13px; font-weight: 600; }
+.rank-row .sub { display: block; font-size: 10.5px; color: var(--text-sub); font-weight: 500; margin-top: 1px; }
+.rank-row .val { font-weight: 800; font-size: 15px; font-variant-numeric: tabular-nums; }
+.rank-row .val small { font-size: 10.5px; color: var(--text-sub); font-weight: 600; }
+.rank-row.now { border: 1.5px solid var(--primary); }
+.rank-empty { text-align: center; color: var(--text-sub); font-size: 12.5px; line-height: 1.8; padding: 30px 10px; }
 
 /* 盤面 */
 .board-wrap {
@@ -484,15 +509,15 @@ body {
       <button class="icon-btn" id="btnSettings">⚙️</button>
     </div>
     <div class="mode-tabs">
-      <button type="button" class="mode-tab on" id="tabLevels">🎯 レベル（全1000問）</button>
+      <button type="button" class="mode-tab on" id="tabLevels">🎯 レベル（全1050問）</button>
       <button type="button" class="mode-tab" id="tabEndless">♾️ エンドレス</button>
     </div>
     <div class="stat-row">
       <div class="stat"><span id="statSize">5×5</span><label>サイズ</label></div>
       <div class="stat"><span id="statTime">00:00</span><label>タイム</label></div>
       <div class="stat"><span id="statFill">0/0</span><label>塗り</label></div>
-      <div class="stat"><span id="statStreak">1/250</span><label id="statStreakLabel">レベル</label></div>
-      <div class="stat"><span id="statBest">0/250</span><label id="statBestLabel">達成</label></div>
+      <div class="stat"><span id="statStreak">1/50</span><label id="statStreakLabel">レベル</label></div>
+      <div class="stat"><span id="statBest">0/50</span><label id="statBestLabel">達成</label></div>
     </div>
   </div>
 
@@ -503,8 +528,9 @@ body {
       <button type="button" class="tier-btn" data-tier="L">15×15</button>
       <button type="button" class="tier-btn" data-tier="XL">20×20</button>
       <button type="button" class="tier-btn" data-tier="XXL">25×25</button>
+      <button type="button" class="tier-btn" data-tier="XXXL">30×30</button>
     </div>
-    <button class="tbtn" id="btnLevelList" style="flex:0 0 66px">📋 一覧</button>
+    <button class="tbtn" id="btnLevelList" style="flex:0 0 66px;height:auto">📋 一覧</button>
   </div>
   <div class="topbar" id="topbarEndless" style="display:none">
     <select class="size-select" id="sizeSelect">
@@ -513,9 +539,11 @@ body {
       <option value="L">15×15</option>
       <option value="XL">20×20</option>
       <option value="XXL">25×25</option>
+      <option value="XXXL">30×30</option>
       <option value="auto">おまかせ（だんだん大きく）</option>
     </select>
-    <button class="tbtn" id="btnNew">🔄 新しい問題</button>
+    <button class="tbtn" id="btnRanking" style="flex:0 0 52px">🏆</button>
+    <button class="tbtn" id="btnNew" style="flex:0 0 120px">🔄 新しい問題</button>
   </div>
 
   <div class="board-wrap">
@@ -552,9 +580,28 @@ body {
         <button type="button" class="tier-btn" data-tier="L">15×15</button>
         <button type="button" class="tier-btn" data-tier="XL">20×20</button>
         <button type="button" class="tier-btn" data-tier="XXL">25×25</button>
+        <button type="button" class="tier-btn" data-tier="XXXL">30×30</button>
       </div>
       <p class="hint-count" id="tierProgressText" style="margin-top:10px"></p>
       <div class="level-grid" id="levelGrid"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ランキングモーダル -->
+<div class="modal" id="rankModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <strong>🏆 エンドレスランキング</strong>
+      <button class="sheet-close" id="btnCloseRank">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="seg" id="rankSeg">
+        <button type="button" class="seg-btn on" data-range="day">日間</button>
+        <button type="button" class="seg-btn" data-range="month">月間</button>
+        <button type="button" class="seg-btn" data-range="all">総合</button>
+      </div>
+      <div id="rankBody" style="margin-top:14px"></div>
     </div>
   </div>
 </div>
@@ -583,7 +630,7 @@ body {
           数字は、その行・列で連続して塗るマスの数を表します。数字が複数ある場合は、書かれた順番どおりに並び、数字と数字の間には必ず1マス以上の空白が入ります。すべての行と列の数字を満たすように塗ると、絵が完成します。<br><br>
           マスの上を指でなぞると連続して塗れます。「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。行や列が数字の通りに塗り終わると、残りのマスに自動で✕が付きます。<br><br>
           すべての行と列の数字を満たすとクリアです。クリア後に「答え合わせ」で、お手本の絵との違いを確認できます。<br><br>
-          「レベル」では難易度別に1000問を用意。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードです。
+          「レベル」では6段階の難易度で計1050問を用意（難易度が上がるほど問題数が増えます）。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードです。
         </p>
       </div>
       <div class="card">
@@ -616,16 +663,20 @@ body {
 <script>
 "use strict";
 
-var STORAGE_KEY = "oekaki_v3";
+var STORAGE_KEY = "oekaki_v4";
 var $ = function (id) { return document.getElementById(id); };
 
+/* 6段階の難易度。難易度が上がるほど問題数が増える（計1050問） */
 var TIERS = [
-  { key: "S", n: 5, count: 250, label: "5×5" },
-  { key: "M", n: 10, count: 250, label: "10×10" },
-  { key: "L", n: 15, count: 250, label: "15×15" },
-  { key: "XL", n: 20, count: 150, label: "20×20" },
-  { key: "XXL", n: 25, count: 100, label: "25×25" }
+  { key: "S", n: 5, count: 50, label: "5×5" },
+  { key: "M", n: 10, count: 100, label: "10×10" },
+  { key: "L", n: 15, count: 150, label: "15×15" },
+  { key: "XL", n: 20, count: 200, label: "20×20" },
+  { key: "XXL", n: 25, count: 250, label: "25×25" },
+  { key: "XXXL", n: 30, count: 300, label: "30×30" }
 ];
+var TOTAL_LEVELS = 0;
+for (var ti = 0; ti < TIERS.length; ti++) TOTAL_LEVELS += TIERS[ti].count;
 function tierByKey(k) {
   for (var i = 0; i < TIERS.length; i++) if (TIERS[i].key === k) return TIERS[i];
   return TIERS[0];
@@ -733,11 +784,12 @@ function newGameStateFromPuzzle(puzzle) {
 }
 
 function sizeForMode(sizeMode, streak) {
-  if (sizeMode === "auto") return Math.min(25, 5 + Math.floor(streak / 3) * 5);
+  if (sizeMode === "auto") return Math.min(30, 5 + Math.floor(streak / 3) * 5);
   if (sizeMode === "M") return 10;
   if (sizeMode === "L") return 15;
   if (sizeMode === "XL") return 20;
   if (sizeMode === "XXL") return 25;
+  if (sizeMode === "XXXL") return 30;
   return 5;
 }
 
@@ -750,7 +802,7 @@ function defaultState() {
   return {
     theme: "dark",
     mode: "levels",
-    endless: { sizeMode: "S", streak: 0, best: 0, totalCleared: 0, game: newGameStateFromPuzzle(buildPuzzle(5)) },
+    endless: { sizeMode: "S", streak: 0, best: 0, totalCleared: 0, history: [], game: newGameStateFromPuzzle(buildPuzzle(5)) },
     levels: { tier: "S", cleared: {}, current: levelsCurrent }
   };
 }
@@ -766,7 +818,8 @@ function load() {
     var raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       var parsed = JSON.parse(raw);
-      if (parsed && parsed.endless && parsed.endless.game && parsed.levels && parsed.levels.current && parsed.levels.current.XXL) {
+      if (parsed && parsed.endless && parsed.endless.game && parsed.levels && parsed.levels.current && parsed.levels.current.XXXL) {
+        if (!parsed.endless.history) parsed.endless.history = [];
         state = parsed;
         return;
       }
@@ -798,7 +851,12 @@ function cellSizeFor(n) {
   if (n <= 10) return 42;
   if (n <= 15) return 32;
   if (n <= 20) return 26;
-  return 20;
+  if (n <= 25) return 20;
+  return 16;
+}
+function todayKey() {
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
 }
 
 /* 盤面全体（ヒント列込み）が画面の幅・高さに収まるようマスの大きさを自動調整 */
@@ -1124,6 +1182,9 @@ function onSolved() {
     state.endless.streak++;
     state.endless.totalCleared++;
     if (state.endless.streak > state.endless.best) state.endless.best = state.endless.streak;
+    if (!state.endless.history) state.endless.history = [];
+    state.endless.history.push({ d: todayKey(), n: g.puzzle.n, t: g.elapsed });
+    if (state.endless.history.length > 3000) state.endless.history.shift();
   } else {
     var tier = state.levels.tier;
     var idx = state.levels.current[tier].idx;
@@ -1181,7 +1242,7 @@ function goNext() {
       toast(t.label + "を全てクリアしました！次は" + nextTier.label + "に挑戦");
       goToLevel(nextTier.key, state.levels.current[nextTier.key].idx, { force: true });
     } else {
-      toast("全1000レベルクリア！お見事です🎉");
+      toast("全" + TOTAL_LEVELS + "レベルクリア！お見事です🎉");
       openLevelList(tier);
     }
     return;
@@ -1286,7 +1347,7 @@ function showWinOverlay() {
 function syncSettingsUI() {
   applyTheme();
   $("settingsTotals").innerHTML =
-    "レベル：" + totalClearedCount() + " / 1000 クリア<br>" +
+    "レベル：" + totalClearedCount() + " / " + TOTAL_LEVELS + " クリア<br>" +
     "エンドレス連続クリア：" + state.endless.streak + "　／　ベスト：" + state.endless.best + "<br>" +
     "エンドレス累計クリア：" + state.endless.totalCleared + "問";
 }
@@ -1321,7 +1382,7 @@ function renderLevelGrid(tierKey) {
     })(i);
   }
   $("tierProgressText").textContent =
-    t.label + "：" + tierClearedCount(tierKey) + " / " + t.count + " クリア　（全体 " + totalClearedCount() + " / 1000）";
+    t.label + "：" + tierClearedCount(tierKey) + " / " + t.count + " クリア　（全体 " + totalClearedCount() + " / " + TOTAL_LEVELS + "）";
 }
 function openLevelList(tierKey) {
   document.querySelectorAll("#tierSegModal .tier-btn").forEach(function (b) {
@@ -1335,6 +1396,89 @@ function openLevelList(tierKey) {
     if (!cur) cur = document.querySelector("#levelGrid .level-cell:not(.cleared)");
     if (cur) cur.scrollIntoView({ block: "center" });
   }, 60);
+}
+
+/* ---------- エンドレスランキング（端末内の自己記録） ---------- */
+function jpDay(key) {
+  var p = key.split("-");
+  return Number(p[1]) + "月" + Number(p[2]) + "日";
+}
+function jpMonth(key) {
+  var p = key.split("-");
+  return p[0] + "年" + Number(p[1]) + "月";
+}
+
+function renderRanking(range) {
+  var body = $("rankBody");
+  var h = state.endless.history || [];
+
+  if (!h.length) {
+    body.innerHTML = '<div class="rank-empty">まだ記録がありません。<br>エンドレスモードでパズルをクリアすると、<br>日ごと・月ごとのクリア数が記録されます。</div>';
+    return;
+  }
+
+  if (range === "all") {
+    var bestBySize = {};
+    for (var i = 0; i < h.length; i++) {
+      var e = h[i];
+      if (bestBySize[e.n] == null || e.t < bestBySize[e.n]) bestBySize[e.n] = e.t;
+    }
+    var html = "";
+    html += '<div class="rank-row now"><div class="no">🏅</div><div class="label">累計クリア</div><div class="val">' + state.endless.totalCleared + '<small> 問</small></div></div>';
+    html += '<div class="rank-row"><div class="no">🔥</div><div class="label">連続クリア（ベスト）</div><div class="val">' + state.endless.best + '<small> 連続</small></div></div>';
+    var sizes = Object.keys(bestBySize).map(Number).sort(function (a, b) { return a - b; });
+    for (var s = 0; s < sizes.length; s++) {
+      var n = sizes[s];
+      html += '<div class="rank-row"><div class="no">⏱</div><div class="label">' + n + "×" + n + ' ベストタイム</div><div class="val">' + fmtTime(bestBySize[n]) + '</div></div>';
+    }
+    body.innerHTML = html;
+    return;
+  }
+
+  // 日間・月間：期間ごとのクリア数ランキング
+  var map = {};
+  for (var j = 0; j < h.length; j++) {
+    var key = range === "day" ? h[j].d : h[j].d.slice(0, 7);
+    map[key] = (map[key] || 0) + 1;
+  }
+  var list = [];
+  for (var k in map) list.push({ key: k, count: map[k] });
+  list.sort(function (a, b) { return b.count - a.count || (a.key < b.key ? 1 : -1); });
+
+  var nowKey = range === "day" ? todayKey() : todayKey().slice(0, 7);
+  var out = "";
+  var shown = Math.min(list.length, 10);
+  var nowInTop = false;
+  for (var r = 0; r < shown; r++) {
+    var item = list[r];
+    var isNow = item.key === nowKey;
+    if (isNow) nowInTop = true;
+    var label = range === "day" ? jpDay(item.key) : jpMonth(item.key);
+    var sub = isNow ? '<span class="sub">' + (range === "day" ? "今日" : "今月") + "</span>" : "";
+    out += '<div class="rank-row top' + (r + 1) + (isNow ? " now" : "") + '">' +
+      '<div class="no">' + (r + 1) + '位</div>' +
+      '<div class="label">' + label + sub + '</div>' +
+      '<div class="val">' + item.count + '<small> 問</small></div></div>';
+  }
+  // 現在の期間が圏外なら下に追記
+  if (!nowInTop) {
+    var nowCount = map[nowKey] || 0;
+    var rank = 1;
+    for (var q = 0; q < list.length; q++) if (list[q].count > nowCount) rank++;
+    out += '<div class="rank-row now"><div class="no">' + (nowCount ? rank + "位" : "—") + '</div>' +
+      '<div class="label">' + (range === "day" ? jpDay(nowKey) : jpMonth(nowKey)) +
+      '<span class="sub">' + (range === "day" ? "今日" : "今月") + '</span></div>' +
+      '<div class="val">' + nowCount + '<small> 問</small></div></div>';
+  }
+  body.innerHTML = out;
+}
+
+function openRanking() {
+  document.querySelectorAll("#rankSeg .seg-btn").forEach(function (b) {
+    b.classList.toggle("on", b.dataset.range === "day");
+  });
+  renderRanking("day");
+  $("rankModal").classList.add("open");
 }
 
 /* ---------- モード切替 ---------- */
@@ -1409,6 +1553,17 @@ document.addEventListener("DOMContentLoaded", function () {
   $("btnLevelList").addEventListener("click", function () { openLevelList(state.levels.tier); });
   $("btnCloseLevelList").addEventListener("click", function () { $("levelListModal").classList.remove("open"); });
   $("levelListModal").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
+  $("btnRanking").addEventListener("click", openRanking);
+  $("btnCloseRank").addEventListener("click", function () { $("rankModal").classList.remove("open"); });
+  $("rankModal").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+  document.querySelectorAll("#rankSeg .seg-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      document.querySelectorAll("#rankSeg .seg-btn").forEach(function (b) { b.classList.remove("on"); });
+      this.classList.add("on");
+      renderRanking(this.dataset.range);
+    });
+  });
 
   $("btnNew").addEventListener("click", function () {
     if (!confirmAbandonIfNeeded()) return;
