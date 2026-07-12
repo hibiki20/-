@@ -170,7 +170,7 @@ body {
 .board-wrap {
   flex: 1;
   min-height: 0;
-  padding: 0 12px 10px;
+  padding: 0 8px 8px;
 }
 .board-scroll {
   width: 100%;
@@ -178,7 +178,7 @@ body {
   overflow: auto;
   background: var(--card);
   border-radius: 14px;
-  padding: 14px;
+  padding: 8px;
   -webkit-overflow-scrolling: touch;
 }
 .board {
@@ -194,7 +194,7 @@ body {
 .clue {
   background: var(--paper);
   color: var(--clue-text);
-  font-size: 11px;
+  font-size: clamp(9px, calc(var(--cell) * 0.34), 12px);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   border: 1px solid var(--paper-line);
@@ -221,10 +221,10 @@ body {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  padding: 0 6px;
+  padding: 0 4px;
   white-space: nowrap;
 }
-.clue-left span { display: inline-block; margin-left: 4px; }
+.clue-left span { display: inline-block; margin-left: 3px; }
 .clue-left span:first-child { margin-left: 0; }
 .clue-left.thick-b { border-bottom: 2px solid var(--paper-line-strong); }
 .cell {
@@ -754,11 +754,28 @@ function fmtTime(s) {
   return String(m).padStart(2, "0") + ":" + String(ss).padStart(2, "0");
 }
 function cellSizeFor(n) {
-  if (n <= 5) return 48;
-  if (n <= 8) return 40;
-  if (n <= 11) return 34;
-  if (n <= 15) return 29;
-  return 24;
+  if (n <= 5) return 52;
+  if (n <= 8) return 44;
+  if (n <= 11) return 38;
+  if (n <= 15) return 32;
+  return 26;
+}
+
+/* 盤面全体（ヒント列込み）が画面の幅・高さに収まるようマスの大きさを自動調整 */
+function fitBoard() {
+  var scroll = $("boardScroll");
+  var board = $("board");
+  var n = currentGame().puzzle.n;
+  var cell = cellSizeFor(n);
+  board.style.setProperty("--cell", cell + "px");
+  for (var i = 0; i < 6; i++) {
+    var overW = board.scrollWidth - scroll.clientWidth;
+    var overH = board.scrollHeight - scroll.clientHeight;
+    var over = Math.max(overW, overH);
+    if (over <= 0 || cell <= 15) break;
+    cell = Math.max(15, cell - Math.ceil(over / n));
+    board.style.setProperty("--cell", cell + "px");
+  }
 }
 function applyTheme() {
   document.body.classList.toggle("light", state.theme === "light");
@@ -781,8 +798,7 @@ function renderBoard() {
   var n = g.puzzle.n;
   var board = $("board");
   board.innerHTML = "";
-  var px = cellSizeFor(n);
-  board.style.setProperty("--cell", px + "px");
+  board.style.setProperty("--cell", cellSizeFor(n) + "px");
   board.style.gridTemplateColumns = "max-content repeat(" + n + ", var(--cell))";
   board.style.gridTemplateRows = "max-content repeat(" + n + ", var(--cell))";
 
@@ -828,6 +844,7 @@ function renderBoard() {
     cellEls.push(rowArr);
   }
   updateAllClueStatus();
+  fitBoard();
 }
 
 function rowComplete(r) {
@@ -910,6 +927,7 @@ function applyDragAction(r, c, action) {
 }
 
 var painting = false, paintAction = null, lastPaintedKey = null;
+var paintStartR = -1, paintStartC = -1, paintAxis = null; // なぞり始めた行/列に直線ロック
 
 function cellFromPoint(x, y) {
   var el = document.elementFromPoint(x, y);
@@ -926,6 +944,9 @@ function boardPointerDown(e) {
   var r = Number(cell.dataset.r), c = Number(cell.dataset.c);
   paintAction = determineDragAction(g.cells[r][c]);
   painting = true;
+  paintStartR = r;
+  paintStartC = c;
+  paintAxis = null;
   lastPaintedKey = r + "_" + c;
   applyDragAction(r, c, paintAction);
 }
@@ -934,6 +955,13 @@ function docPointerMove(e) {
   var cell = cellFromPoint(e.clientX, e.clientY);
   if (!cell) return;
   var r = Number(cell.dataset.r), c = Number(cell.dataset.c);
+  // 最初に動いた方向（横/縦）を判定し、以降はその行/列に固定。
+  // 指が少し斜めにずれても隣の行・列を誤って塗らない
+  if (paintAxis === null && (r !== paintStartR || c !== paintStartC)) {
+    paintAxis = Math.abs(c - paintStartC) >= Math.abs(r - paintStartR) ? "h" : "v";
+  }
+  if (paintAxis === "h") r = paintStartR;
+  else if (paintAxis === "v") c = paintStartC;
   var key = r + "_" + c;
   if (key === lastPaintedKey) return;
   lastPaintedKey = key;
@@ -944,6 +972,7 @@ function docPointerUp() {
   painting = false;
   paintAction = null;
   lastPaintedKey = null;
+  paintAxis = null;
 }
 
 function undo() {
@@ -1152,6 +1181,12 @@ function openLevelList(tierKey) {
   });
   renderLevelGrid(tierKey);
   $("levelListModal").classList.add("open");
+  // 現在挑戦中のレベルが見える位置まで自動スクロール
+  setTimeout(function () {
+    var cur = document.querySelector("#levelGrid .level-cell.current");
+    if (!cur) cur = document.querySelector("#levelGrid .level-cell:not(.cleared)");
+    if (cur) cur.scrollIntoView({ block: "center" });
+  }, 60);
 }
 
 /* ---------- モード切替 ---------- */
@@ -1180,6 +1215,12 @@ document.addEventListener("DOMContentLoaded", function () {
   document.addEventListener("pointerup", docPointerUp);
   document.addEventListener("pointercancel", docPointerUp);
   $("board").addEventListener("contextmenu", function (e) { e.preventDefault(); });
+
+  var fitTimer = null;
+  window.addEventListener("resize", function () {
+    clearTimeout(fitTimer);
+    fitTimer = setTimeout(fitBoard, 150);
+  });
 
   $("modeFillBtn").addEventListener("click", function () {
     mode = "fill";
