@@ -682,6 +682,14 @@ body.dpad-mode .bottombar { display: none; }
 /* クリアモーダル */
 .win-sheet { padding: 30px 24px calc(24px + env(safe-area-inset-bottom)); text-align: center; }
 .win-emoji { font-size: 52px; }
+@keyframes winPop {
+  0% { transform: scale(.3); opacity: 0; }
+  60% { transform: scale(1.18); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.modal.open .win-emoji { animation: winPop .5s ease; }
+.modal.open .win-sheet h2 { animation: winPop .5s .08s ease backwards; }
+.modal.open .win-stats { animation: winPop .45s .16s ease backwards; }
 .win-sheet h2 { font-size: 22px; font-weight: 800; margin: 6px 0 6px; }
 .win-note { font-size: 12px; color: var(--text-sub); margin-bottom: 16px; }
 .win-stats { display: flex; justify-content: center; gap: 22px; margin-bottom: 22px; }
@@ -1156,8 +1164,14 @@ function fitBoard() {
 }
 
 function applyZoom() {
+  var view = $("cellsView");
+  // ズーム前に見えていた中央位置を覚えておき、ズーム後も同じ場所が中央に来るようにする
+  var cx = (view.scrollLeft + view.clientWidth / 2) / Math.max(1, view.scrollWidth);
+  var cy = (view.scrollTop + view.clientHeight / 2) / Math.max(1, view.scrollHeight);
   var px = Math.max(9, Math.min(72, Math.round(baseCell * zoomFactor)));
   setCellSize(px);
+  view.scrollLeft = cx * view.scrollWidth - view.clientWidth / 2;
+  view.scrollTop = cy * view.scrollHeight - view.clientHeight / 2;
   syncCluePanes();
   updateScrollSliders();
 }
