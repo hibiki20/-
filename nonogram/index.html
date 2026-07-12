@@ -198,14 +198,56 @@ body {
   min-height: 0;
   padding: 0 8px 8px;
 }
-.board-scroll {
+.board-area {
   width: 100%;
   height: 100%;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  grid-template-rows: 1fr auto;
+  gap: 6px;
+}
+.board-scroll {
+  min-width: 0;
+  min-height: 0;
   overflow: auto;
   background: var(--card);
   border-radius: 14px;
   padding: 8px;
   -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.board-scroll::-webkit-scrollbar { display: none; }
+
+/* スクロールスライダー（盤面がはみ出すときだけ表示） */
+.scroll-slider {
+  appearance: none;
+  -webkit-appearance: none;
+  background: var(--card);
+  border-radius: 8px;
+  margin: 0;
+  display: none;
+}
+.scroll-slider.show { display: block; }
+.scroll-slider.h { grid-column: 1; grid-row: 2; width: 100%; height: 22px; }
+.scroll-slider.v { grid-column: 2; grid-row: 1; height: 100%; width: 22px; writing-mode: vertical-lr; }
+.scroll-slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 22px;
+  border-radius: 8px;
+  background: var(--primary);
+  border: none;
+  cursor: pointer;
+}
+.scroll-slider.v::-webkit-slider-thumb { width: 22px; height: 44px; }
+.scroll-slider::-moz-range-thumb {
+  width: 44px;
+  height: 22px;
+  border-radius: 8px;
+  background: var(--primary);
+  border: none;
+  cursor: pointer;
 }
 .board {
   display: inline-grid;
@@ -271,13 +313,68 @@ body {
   font-weight: 700;
   color: var(--mark-color);
 }
-.board.scrollable .cell { touch-action: auto; }
 .cell.thick-r { border-right: 2px solid var(--paper-line-strong); }
 .cell.thick-b { border-bottom: 2px solid var(--paper-line-strong); }
 .cell.filled { background: var(--ink); }
+/* 十字キーモードのカーソル */
+.cell.cursor {
+  outline: 3px solid var(--gold);
+  outline-offset: -3px;
+  z-index: 2;
+}
 /* 答え合わせ表示 */
 .cell.rv-wrong { background: var(--wrong-bg); }
 .cell.rv-missed { background: var(--missed-bg); }
+
+/* 十字キー操作パネル */
+.dpad-panel {
+  flex-shrink: 0;
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 16px 2px;
+}
+.dpad-panel.show { display: flex; }
+.dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 52px);
+  grid-template-rows: repeat(3, 44px);
+  gap: 4px;
+}
+.d-btn {
+  border: 1.5px solid var(--border);
+  background: var(--card2);
+  color: var(--text);
+  border-radius: 10px;
+  font-size: 15px;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: none;
+}
+.d-btn:active { background: var(--primary); border-color: var(--primary); color: #fff; }
+.d-up { grid-column: 2; grid-row: 1; }
+.d-left { grid-column: 1; grid-row: 2; }
+.d-right { grid-column: 3; grid-row: 2; }
+.d-down { grid-column: 2; grid-row: 3; }
+.dpad-action {
+  flex: 1;
+  height: 96px;
+  border-radius: 16px;
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 800;
+  font-family: inherit;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+.dpad-action:active { transform: scale(.97); background: var(--primary-dark); }
 
 /* 下部バー（主要操作：親指で押しやすい位置） */
 .bottombar {
@@ -547,9 +644,23 @@ body {
   </div>
 
   <div class="board-wrap">
-    <div class="board-scroll" id="boardScroll">
-      <div class="board" id="board"></div>
+    <div class="board-area">
+      <div class="board-scroll" id="boardScroll">
+        <div class="board" id="board"></div>
+      </div>
+      <input type="range" class="scroll-slider v" id="vScroll" min="0" max="0" value="0" aria-label="縦スクロール">
+      <input type="range" class="scroll-slider h" id="hScroll" min="0" max="0" value="0" aria-label="横スクロール">
     </div>
+  </div>
+
+  <div class="dpad-panel" id="dpadPanel">
+    <div class="dpad">
+      <button type="button" class="d-btn d-up" data-dir="up">▲</button>
+      <button type="button" class="d-btn d-left" data-dir="left">◀</button>
+      <button type="button" class="d-btn d-right" data-dir="right">▶</button>
+      <button type="button" class="d-btn d-down" data-dir="down">▼</button>
+    </div>
+    <button type="button" class="dpad-action" id="dpadAction">🖊 塗る</button>
   </div>
 
   <div class="bottombar">
@@ -615,7 +726,7 @@ body {
     </div>
     <div class="sheet-body">
       <div class="card">
-        <div class="card-title">表示</div>
+        <div class="card-title">表示・操作</div>
         <div class="field">
           <label>テーマ</label>
           <div class="seg">
@@ -623,12 +734,21 @@ body {
             <button type="button" class="seg-btn" id="themeDarkBtn">ダーク</button>
           </div>
         </div>
+        <div class="field" style="margin-top:12px">
+          <label>マスの塗り方</label>
+          <div class="seg">
+            <button type="button" class="seg-btn" id="inputTouchBtn">👆 手塗り</button>
+            <button type="button" class="seg-btn" id="inputDpadBtn">🎮 十字キー</button>
+          </div>
+          <p class="hint-count" style="margin-top:8px" id="inputMethodHint"></p>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">遊び方</div>
         <p class="howto">
           数字は、その行・列で連続して塗るマスの数を表します。数字が複数ある場合は、書かれた順番どおりに並び、数字と数字の間には必ず1マス以上の空白が入ります。すべての行と列の数字を満たすように塗ると、絵が完成します。<br><br>
-          マスの上を指でなぞると連続して塗れます。「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。行や列が数字の通りに塗り終わると、残りのマスに自動で✕が付きます。<br><br>
+          塗り方は2種類から選べます。「手塗り」はマスの上を指でなぞって直接塗る方式、「十字キー」は方向ボタンでカーソルを動かして大きなボタンで塗る方式です（細かいマスでも正確に塗れます）。「塗る」でマスを塗り、「印をつける」で空白と分かっているマスに✕印を置けます。行や列が数字の通りに塗り終わると、残りのマスに自動で✕が付きます。<br><br>
+          盤面が画面に収まらない大きさのときは、盤面の下と右にスクロールバーが表示され、つまみを動かして見たい場所へ移動できます。<br><br>
           すべての行と列の数字を満たすとクリアです。クリア後に「答え合わせ」で、お手本の絵との違いを確認できます。<br><br>
           「レベル」では6段階の難易度で計1050問を用意（難易度が上がるほど問題数が増えます）。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードです。
         </p>
@@ -801,6 +921,7 @@ function defaultState() {
   }
   return {
     theme: "dark",
+    inputMethod: "touch",
     mode: "levels",
     endless: { sizeMode: "S", streak: 0, best: 0, totalCleared: 0, history: [], game: newGameStateFromPuzzle(buildPuzzle(5)) },
     levels: { tier: "S", cleared: {}, current: levelsCurrent }
@@ -820,6 +941,7 @@ function load() {
       var parsed = JSON.parse(raw);
       if (parsed && parsed.endless && parsed.endless.game && parsed.levels && parsed.levels.current && parsed.levels.current.XXXL) {
         if (!parsed.endless.history) parsed.endless.history = [];
+        if (!parsed.inputMethod) parsed.inputMethod = "touch";
         state = parsed;
         return;
       }
@@ -874,9 +996,21 @@ function fitBoard() {
     cell = Math.max(12, cell - Math.ceil(over / n));
     board.style.setProperty("--cell", cell + "px");
   }
-  // それでも収まらない場合のみスクロール可能に（ドラッグ塗りよりスクロールを優先）
-  var still = (board.scrollWidth > scroll.clientWidth) || (board.scrollHeight > scroll.clientHeight);
-  board.classList.toggle("scrollable", still);
+  updateScrollSliders();
+}
+
+/* 盤面がはみ出しているときだけ、下・右のスクロールスライダーを表示 */
+function updateScrollSliders() {
+  var scroll = $("boardScroll");
+  var h = $("hScroll"), v = $("vScroll");
+  var maxX = scroll.scrollWidth - scroll.clientWidth;
+  var maxY = scroll.scrollHeight - scroll.clientHeight;
+  h.classList.toggle("show", maxX > 4);
+  v.classList.toggle("show", maxY > 4);
+  h.max = Math.max(0, maxX);
+  v.max = Math.max(0, maxY);
+  h.value = scroll.scrollLeft;
+  v.value = scroll.scrollTop;
 }
 
 function applyTheme() {
@@ -949,6 +1083,9 @@ function renderBoard() {
   }
   updateAllClueStatus();
   fitBoard();
+  cursorR = 0;
+  cursorC = 0;
+  renderCursor();
 }
 
 /* ---------- ヒント数字の達成判定（自分の塗りが数字パターンと一致しているか） ---------- */
@@ -1077,6 +1214,13 @@ function boardPointerDown(e) {
   if (g.solved) return;
   e.preventDefault();
   var r = Number(cell.dataset.r), c = Number(cell.dataset.c);
+  if (state.inputMethod === "dpad") {
+    // 十字キーモードではタップはカーソル移動のみ（誤タップで塗らない）
+    cursorR = r;
+    cursorC = c;
+    renderCursor();
+    return;
+  }
   paintAction = determineDragAction(g.cells[r][c]);
   painting = true;
   paintStartR = r;
@@ -1108,6 +1252,57 @@ function docPointerUp() {
   paintAction = null;
   lastPaintedKey = null;
   paintAxis = null;
+}
+
+/* ---------- 十字キー操作 ---------- */
+var cursorR = 0, cursorC = 0;
+
+function applyInputMethod() {
+  var dpad = state.inputMethod === "dpad";
+  $("dpadPanel").classList.toggle("show", dpad);
+  $("inputTouchBtn").classList.toggle("on", !dpad);
+  $("inputDpadBtn").classList.toggle("on", dpad);
+  $("inputMethodHint").textContent = dpad
+    ? "十字キーでカーソルを動かし、大きいボタンで塗ります。マスをタップするとカーソルがそこへ移動します。"
+    : "マスを指でなぞって直接塗ります。";
+  renderCursor();
+  // パネルの表示/非表示で盤面の高さが変わるため再フィット
+  setTimeout(fitBoard, 30);
+}
+
+function renderCursor() {
+  var old = document.querySelector(".cell.cursor");
+  if (old) old.classList.remove("cursor");
+  if (state.inputMethod !== "dpad") return;
+  if (!cellEls.length) return;
+  var n = currentGame().puzzle.n;
+  cursorR = Math.max(0, Math.min(n - 1, cursorR));
+  cursorC = Math.max(0, Math.min(n - 1, cursorC));
+  var el = cellEls[cursorR][cursorC];
+  el.classList.add("cursor");
+  // カーソルが画面外に出たら追従スクロール
+  el.scrollIntoView({ block: "nearest", inline: "nearest" });
+  updateScrollSliders();
+}
+
+function moveCursor(dir) {
+  if (state.inputMethod !== "dpad") return;
+  if (dir === "up") cursorR--;
+  else if (dir === "down") cursorR++;
+  else if (dir === "left") cursorC--;
+  else if (dir === "right") cursorC++;
+  renderCursor();
+}
+
+function dpadAct() {
+  var g = currentGame();
+  if (g.solved) return;
+  var action = determineDragAction(g.cells[cursorR][cursorC]);
+  applyDragAction(cursorR, cursorC, action);
+}
+
+function updateDpadActionLabel() {
+  $("dpadAction").textContent = mode === "fill" ? "🖊 塗る" : "✕ 印";
 }
 
 function undo() {
@@ -1346,6 +1541,7 @@ function showWinOverlay() {
 
 function syncSettingsUI() {
   applyTheme();
+  applyInputMethod();
   $("settingsTotals").innerHTML =
     "レベル：" + totalClearedCount() + " / " + TOTAL_LEVELS + " クリア<br>" +
     "エンドレス連続クリア：" + state.endless.streak + "　／　ベスト：" + state.endless.best + "<br>" +
@@ -1498,6 +1694,8 @@ document.addEventListener("DOMContentLoaded", function () {
   load();
   applyTheme();
   setAppMode(state.mode);
+  applyInputMethod();
+  updateDpadActionLabel();
   renderBoard();
   updateStatsUI();
   startTimer();
@@ -1515,15 +1713,58 @@ document.addEventListener("DOMContentLoaded", function () {
     fitTimer = setTimeout(fitBoard, 150);
   });
 
+  // スクロールスライダー ⇔ 盤面スクロールの同期
+  var boardScroll = $("boardScroll");
+  $("hScroll").addEventListener("input", function () { boardScroll.scrollLeft = Number(this.value); });
+  $("vScroll").addEventListener("input", function () { boardScroll.scrollTop = Number(this.value); });
+  boardScroll.addEventListener("scroll", function () {
+    $("hScroll").value = boardScroll.scrollLeft;
+    $("vScroll").value = boardScroll.scrollTop;
+  }, { passive: true });
+
+  // 十字キー（押しっぱなしで連続移動）
+  var dpadTimer = null;
+  document.querySelectorAll(".d-btn").forEach(function (btn) {
+    var dir = btn.dataset.dir;
+    function start(e) {
+      e.preventDefault();
+      moveCursor(dir);
+      clearInterval(dpadTimer);
+      var started = Date.now();
+      dpadTimer = setInterval(function () {
+        if (Date.now() - started > 320) moveCursor(dir);
+      }, 110);
+    }
+    function stop() { clearInterval(dpadTimer); }
+    btn.addEventListener("pointerdown", start);
+    btn.addEventListener("pointerup", stop);
+    btn.addEventListener("pointercancel", stop);
+    btn.addEventListener("pointerleave", stop);
+  });
+  $("dpadAction").addEventListener("click", dpadAct);
+
+  $("inputTouchBtn").addEventListener("click", function () {
+    state.inputMethod = "touch";
+    save();
+    applyInputMethod();
+  });
+  $("inputDpadBtn").addEventListener("click", function () {
+    state.inputMethod = "dpad";
+    save();
+    applyInputMethod();
+  });
+
   $("modeFillBtn").addEventListener("click", function () {
     mode = "fill";
     $("modeFillBtn").classList.add("on");
     $("modeMarkBtn").classList.remove("on");
+    updateDpadActionLabel();
   });
   $("modeMarkBtn").addEventListener("click", function () {
     mode = "mark";
     $("modeMarkBtn").classList.add("on");
     $("modeFillBtn").classList.remove("on");
+    updateDpadActionLabel();
   });
 
   $("btnUndo").addEventListener("click", undo);
@@ -1595,6 +1836,7 @@ document.addEventListener("DOMContentLoaded", function () {
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) {}
     state = defaultState();
     applyTheme();
+    applyInputMethod();
     setAppMode(state.mode);
     renderBoard();
     updateStatsUI();
