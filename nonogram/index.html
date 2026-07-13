@@ -229,7 +229,7 @@ body {
   height: 100%;
   display: grid;
   grid-template-columns: 1fr auto;
-  grid-template-rows: 1fr auto;
+  grid-template-rows: 1fr auto auto;
   gap: 6px;
 }
 .board-frame {
@@ -360,31 +360,39 @@ body {
   cursor: pointer;
 }
 
-/* ズームボタン */
-.zoom-btns {
-  position: absolute;
-  right: 32px;
-  bottom: 32px;
+/* ズームバー（盤面の外・下に配置。パズルと重ならない） */
+.zoom-bar {
+  grid-column: 1 / span 2;
+  grid-row: 3;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  z-index: 20;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
 }
-.zoom-btns button {
-  width: 42px;
-  height: 42px;
-  border-radius: 12px;
+.zoom-bar .zoom-label {
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--text-sub);
+  font-weight: 600;
+  padding-left: 2px;
+}
+.zoom-bar button {
+  width: 56px;
+  height: 38px;
+  border-radius: 11px;
   border: 1.5px solid var(--border);
-  background: rgba(28, 31, 66, 0.88);
+  background: var(--card);
   color: var(--text);
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
   font-family: inherit;
   cursor: pointer;
-  backdrop-filter: blur(2px);
 }
-body.light .zoom-btns button { background: rgba(255, 255, 255, 0.9); }
-.zoom-btns button:active { background: var(--primary); color: #fff; }
+.zoom-bar button:active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* 十字キーモード：カーソルの行・列をうっすらハイライト */
+.cell.hl { box-shadow: inset 0 0 0 99px rgba(91, 110, 240, 0.10); }
+.cell.cursor.hl { box-shadow: none; }
 
 /* 下部バー（主要操作：親指で押しやすい位置） */
 .bottombar {
@@ -729,7 +737,8 @@ body.dpad-mode .bottombar { display: none; }
       <button class="icon-btn" id="btnSettings">⚙️</button>
     </div>
     <div class="mode-tabs">
-      <button type="button" class="mode-tab on" id="tabLevels">🎯 レベル（全1050問）</button>
+      <button type="button" class="mode-tab on" id="tabLevels">🎯 レベル</button>
+      <button type="button" class="mode-tab" id="tabDaily">📅 毎日</button>
       <button type="button" class="mode-tab" id="tabEndless">♾️ エンドレス</button>
     </div>
     <div class="stat-row">
@@ -751,6 +760,9 @@ body.dpad-mode .bottombar { display: none; }
       <button type="button" class="tier-btn" data-tier="XXXL">30×30</button>
     </div>
     <button class="tbtn" id="btnLevelList" style="flex:0 0 66px;height:auto">📋 一覧</button>
+  </div>
+  <div class="topbar" id="topbarDaily" style="display:none">
+    <div class="tbtn" id="dailyInfo" style="display:flex;align-items:center;justify-content:center;cursor:default"></div>
   </div>
   <div class="topbar" id="topbarEndless" style="display:none">
     <select class="size-select" id="sizeSelect">
@@ -776,10 +788,11 @@ body.dpad-mode .bottombar { display: none; }
       </div>
       <input type="range" class="scroll-slider v" id="vScroll" min="0" max="0" value="0" aria-label="縦スクロール">
       <input type="range" class="scroll-slider h" id="hScroll" min="0" max="0" value="0" aria-label="横スクロール">
-      <div class="zoom-btns">
-        <button type="button" id="zoomIn" title="拡大">＋</button>
-        <button type="button" id="zoomOut" title="縮小">−</button>
+      <div class="zoom-bar">
+        <span class="zoom-label" id="zoomLabel">100%</span>
         <button type="button" id="zoomFit" title="全体表示">⛶</button>
+        <button type="button" id="zoomOut" title="縮小">−</button>
+        <button type="button" id="zoomIn" title="拡大">＋</button>
       </div>
     </div>
   </div>
@@ -885,6 +898,13 @@ body.dpad-mode .bottombar { display: none; }
           </div>
           <p class="hint-count" style="margin-top:8px" id="inputMethodHint"></p>
         </div>
+        <div class="field" style="margin-top:12px">
+          <label>効果音</label>
+          <div class="seg">
+            <button type="button" class="seg-btn" id="soundOnBtn">🔊 オン</button>
+            <button type="button" class="seg-btn" id="soundOffBtn">🔇 オフ</button>
+          </div>
+        </div>
       </div>
       <div class="card">
         <div class="card-title">遊び方</div>
@@ -918,6 +938,28 @@ body.dpad-mode .bottombar { display: none; }
     </div>
     <button class="btn btn-outline" id="btnReview">🔍 答え合わせを見る</button>
     <button class="btn btn-primary" id="btnNext">つぎへ進む</button>
+  </div>
+</div>
+
+<!-- 初回チュートリアル -->
+<div class="modal" id="welcomeModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <strong>🎨 ようこそ！</strong>
+      <button class="sheet-close" id="btnCloseWelcome">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="card">
+        <p class="howto">
+          <b style="color:var(--text)">遊び方はかんたん3ステップ：</b><br><br>
+          <b>1.</b> 数字は「その行・列で連続して塗るマスの数」。<span style="white-space:nowrap">「2 1」</span>なら、2マス連続→1マス以上あけて→1マス塗ります。<br><br>
+          <b>2.</b> マスをなぞって塗りましょう。空白と確定したマスには「✕印」を付けると考えやすくなります。行・列が完成すると残りに自動で✕が付きます。<br><br>
+          <b>3.</b> すべての行と列の数字を満たすと絵が完成！<br><br>
+          細かい盤面は、盤面下の「＋」で拡大したり、🎮十字キーモード（画面下のボタンで切替）で正確に塗れます。
+        </p>
+      </div>
+      <button class="btn btn-primary" id="btnStartPlay">はじめる</button>
+    </div>
   </div>
 </div>
 
@@ -1070,15 +1112,40 @@ function defaultState() {
   return {
     theme: "dark",
     inputMethod: "touch",
+    sound: true,
     mode: "levels",
     online: { nickname: "", seeded: false },
     endless: { sizeMode: "S", streak: 0, best: 0, totalCleared: 0, history: [], game: newGameStateFromPuzzle(buildPuzzle(5)) },
+    daily: { dateKey: "", game: null, streak: 0, lastClearDate: "", totalCleared: 0 },
     levels: { tier: "S", cleared: {}, current: levelsCurrent }
   };
 }
 
+/* ---------- デイリーチャレンジ ---------- */
+/* 曜日でサイズが変わる：月火=10、水木金=15、土日=20 */
+function dailySizeFor(dateKey) {
+  var day = new Date(dateKey + "T00:00:00").getDay();
+  if (day === 0 || day === 6) return 20;
+  if (day >= 3) return 15;
+  return 10;
+}
+function buildDailyPuzzle(dateKey) {
+  var rng = mulberry32(seedFor("daily-" + dateKey, 1));
+  return buildPuzzle(dailySizeFor(dateKey), rng, 0.5);
+}
+/* 日付が変わっていたら今日の問題に差し替える */
+function ensureDailyGame() {
+  var today = todayKey();
+  if (!state.daily.game || state.daily.dateKey !== today) {
+    state.daily.dateKey = today;
+    state.daily.game = newGameStateFromPuzzle(buildDailyPuzzle(today));
+    save();
+  }
+}
+
 function currentGame() {
   if (state.mode === "endless") return state.endless.game;
+  if (state.mode === "daily") { ensureDailyGame(); return state.daily.game; }
   return state.levels.current[state.levels.tier].game;
 }
 
@@ -1092,6 +1159,9 @@ function load() {
         if (!parsed.endless.history) parsed.endless.history = [];
         if (!parsed.inputMethod) parsed.inputMethod = "touch";
         if (!parsed.online) parsed.online = { nickname: "", seeded: false };
+        if (parsed.sound == null) parsed.sound = true;
+        if (!parsed.daily) parsed.daily = { dateKey: "", game: null, streak: 0, lastClearDate: "", totalCleared: 0 };
+        if (parsed.mode !== "levels" && parsed.mode !== "endless" && parsed.mode !== "daily") parsed.mode = "levels";
         state = parsed;
         return;
       }
@@ -1113,6 +1183,39 @@ function toast(msg) {
 }
 function vibrate(ms) {
   try { if (navigator.vibrate) navigator.vibrate(ms); } catch (e) {}
+}
+
+/* ---------- 効果音（Web Audioで生成・設定でオンオフ） ---------- */
+var audioCtx = null;
+function tone(freq, startAt, dur, type, vol) {
+  var o = audioCtx.createOscillator();
+  var g = audioCtx.createGain();
+  o.type = type || "square";
+  o.frequency.value = freq;
+  var t = audioCtx.currentTime + (startAt || 0);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(vol || 0.08, t + 0.01);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(audioCtx.destination);
+  o.start(t);
+  o.stop(t + dur + 0.02);
+}
+function sfx(kind) {
+  if (!state || !state.sound) return;
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === "suspended") audioCtx.resume();
+    if (kind === "fill") tone(520, 0, 0.06, "square", 0.05);
+    else if (kind === "erase") tone(300, 0, 0.05, "square", 0.04);
+    else if (kind === "mark") tone(220, 0, 0.05, "triangle", 0.06);
+    else if (kind === "line") { tone(660, 0, 0.07, "sine", 0.07); tone(880, 0.08, 0.09, "sine", 0.07); }
+    else if (kind === "win") {
+      tone(523, 0, 0.12, "triangle", 0.09);
+      tone(659, 0.11, 0.12, "triangle", 0.09);
+      tone(784, 0.22, 0.12, "triangle", 0.09);
+      tone(1047, 0.33, 0.22, "triangle", 0.10);
+    }
+  } catch (e) {}
 }
 function fmtTime(s) {
   var m = Math.floor(s / 60), ss = s % 60;
@@ -1174,6 +1277,8 @@ function applyZoom() {
   view.scrollTop = cy * view.scrollHeight - view.clientHeight / 2;
   syncCluePanes();
   updateScrollSliders();
+  var label = $("zoomLabel");
+  if (label) label.textContent = Math.round((px / Math.max(1, baseCell)) * 100) + "%";
 }
 function zoomBy(f) {
   zoomFactor = Math.max(0.5, Math.min(4, zoomFactor * f));
@@ -1361,12 +1466,16 @@ function setCellState(r, c, val, group) {
 /* 数字パターンを満たした行・列の残りマスへ自動で✕を付ける */
 function autoCrossLine(r, c, group) {
   var g = currentGame(), n = g.puzzle.n, i;
+  var lineDone = false;
   if (rowSatisfied(r)) {
+    lineDone = true;
     for (i = 0; i < n; i++) if (g.cells[r][i] === 0) setCellState(r, i, 2, group);
   }
   if (colSatisfied(c)) {
+    lineDone = true;
     for (i = 0; i < n; i++) if (g.cells[i][c] === 0) setCellState(i, c, 2, group);
   }
+  if (lineDone) { sfx("line"); vibrate(15); }
 }
 
 function applyDragAction(r, c, action) {
@@ -1382,6 +1491,9 @@ function applyDragAction(r, c, action) {
 
   var group = [];
   setCellState(r, c, next, group);
+  if (action === "fill") sfx("fill");
+  else if (action === "erase" || action === "unmark") sfx("erase");
+  else if (action === "mark") sfx("mark");
   if (next === 1) autoCrossLine(r, c, group);
   g.history.push(group);
   if (g.history.length > 500) g.history.shift();
@@ -1535,12 +1647,19 @@ function ensureCursorVisible() {
 function renderCursor() {
   var old = document.querySelector(".cell.cursor");
   if (old) old.classList.remove("cursor");
+  var oldHl = document.querySelectorAll(".cell.hl");
+  for (var i = 0; i < oldHl.length; i++) oldHl[i].classList.remove("hl");
   if (state.inputMethod !== "dpad") return;
   if (!cellEls.length) return;
   var n = currentGame().puzzle.n;
   cursorR = Math.max(0, Math.min(n - 1, cursorR));
   cursorC = Math.max(0, Math.min(n - 1, cursorC));
   cellEls[cursorR][cursorC].classList.add("cursor");
+  // カーソルの行・列をうっすらハイライトして位置を掴みやすく
+  for (var k = 0; k < n; k++) {
+    cellEls[cursorR][k].classList.add("hl");
+    cellEls[k][cursorC].classList.add("hl");
+  }
   ensureCursorVisible();
 }
 
@@ -1634,12 +1753,21 @@ function showSolvedArt() {
   fitBoard();
 }
 
+var lastWinInfo = null; // クリア画面に出す補足（ベスト更新など）
+
 function onSolved() {
   var g = currentGame();
   g.solved = true;
   vibrate(60);
+  sfx("win");
   showSolvedArt();
+  lastWinInfo = null;
   if (state.mode === "endless") {
+    // このサイズのベストタイムを更新したか（記録前に判定）
+    var bestT = null;
+    var h = state.endless.history || [];
+    for (var i = 0; i < h.length; i++) if (h[i].n === g.puzzle.n && (bestT == null || h[i].t < bestT)) bestT = h[i].t;
+    if (bestT != null && g.elapsed < bestT) lastWinInfo = "⚡ " + g.puzzle.n + "×" + g.puzzle.n + "のベストタイム更新！（前回 " + fmtTime(bestT) + "）";
     state.endless.streak++;
     state.endless.totalCleared++;
     if (state.endless.streak > state.endless.best) state.endless.best = state.endless.streak;
@@ -1647,11 +1775,25 @@ function onSolved() {
     state.endless.history.push({ d: todayKey(), n: g.puzzle.n, t: g.elapsed });
     if (state.endless.history.length > 3000) state.endless.history.shift();
     submitClearOnline();
+  } else if (state.mode === "daily") {
+    var today = todayKey();
+    if (state.daily.lastClearDate !== today) {
+      var yest = new Date();
+      yest.setDate(yest.getDate() - 1);
+      var yestKey = yest.getFullYear() + "-" + String(yest.getMonth() + 1).padStart(2, "0") + "-" + String(yest.getDate()).padStart(2, "0");
+      state.daily.streak = (state.daily.lastClearDate === yestKey) ? state.daily.streak + 1 : 1;
+      state.daily.lastClearDate = today;
+      state.daily.totalCleared++;
+    }
+    lastWinInfo = "🔥 デイリー連続 " + state.daily.streak + " 日目！また明日、新しい問題が届きます";
   } else {
     var tier = state.levels.tier;
     var idx = state.levels.current[tier].idx;
     var key = tier + "-" + idx;
     var prev = state.levels.cleared[key];
+    if (prev && g.elapsed < prev.time) {
+      lastWinInfo = "⚡ ベストタイム更新！（前回 " + fmtTime(prev.time) + "）";
+    }
     if (!prev || g.elapsed < prev.time) {
       state.levels.cleared[key] = { time: g.elapsed, clearedAt: Date.now() };
     }
@@ -1691,6 +1833,11 @@ function goNext() {
   reviewing = false;
   if (state.mode === "endless") {
     startNewEndlessPuzzle(false);
+    return;
+  }
+  if (state.mode === "daily") {
+    // 日替わりは1日1問。完成した絵を眺められるようにそのまま残す
+    toast("今日の問題クリア！また明日🎉");
     return;
   }
   var tier = state.levels.tier;
@@ -1804,6 +1951,13 @@ function updateStatsUI() {
     $("statBestLabel").textContent = "ベスト";
     $("statBest").textContent = state.endless.best;
     $("sizeSelect").value = state.endless.sizeMode;
+  } else if (state.mode === "daily") {
+    $("statStreakLabel").textContent = "連続日数";
+    $("statStreak").textContent = state.daily.streak;
+    $("statBestLabel").textContent = "累計";
+    $("statBest").textContent = state.daily.totalCleared;
+    var p = state.daily.dateKey.split("-");
+    $("dailyInfo").textContent = "📅 " + Number(p[1]) + "月" + Number(p[2]) + "日の問題（" + g.puzzle.n + "×" + g.puzzle.n + "）" + (g.solved ? "　✓クリア済み" : "");
   } else {
     var tier = state.levels.tier;
     var t = tierByKey(tier);
@@ -1822,21 +1976,36 @@ function showWinOverlay() {
   var d = diff.wrong.length + diff.missed.length;
   $("winTime").textContent = fmtTime(g.elapsed);
   $("winDiff").textContent = d;
-  $("winNote").textContent = d === 0 ? "お手本の絵と完全一致です！" : "数字をすべて満たしました（別解クリア）";
+  var note = d === 0 ? "お手本の絵と完全一致です！" : "数字をすべて満たしました（別解クリア）";
+  if (lastWinInfo) note += "\n" + lastWinInfo;
+  $("winNote").textContent = note;
+  $("winNote").style.whiteSpace = "pre-line";
   if (state.mode === "endless") {
     $("winStreakLabel").textContent = "連続クリア";
     $("winStreak").textContent = state.endless.streak;
+    $("btnNext").textContent = "つぎへ進む";
+  } else if (state.mode === "daily") {
+    $("winStreakLabel").textContent = "連続日数";
+    $("winStreak").textContent = state.daily.streak;
+    $("btnNext").textContent = "OK（また明日！）";
   } else {
     var tier = state.levels.tier, t = tierByKey(tier);
     $("winStreakLabel").textContent = "達成";
     $("winStreak").textContent = tierClearedCount(tier) + "/" + t.count;
+    $("btnNext").textContent = "つぎへ進む";
   }
   $("winModal").classList.add("open");
+}
+
+function syncSoundButtons() {
+  $("soundOnBtn").classList.toggle("on", !!state.sound);
+  $("soundOffBtn").classList.toggle("on", !state.sound);
 }
 
 function syncSettingsUI() {
   applyTheme();
   applyInputMethod();
+  syncSoundButtons();
   $("settingsTotals").innerHTML =
     "レベル：" + totalClearedCount() + " / " + TOTAL_LEVELS + " クリア<br>" +
     "エンドレス連続クリア：" + state.endless.streak + "　／　ベスト：" + state.endless.best + "<br>" +
@@ -2096,13 +2265,17 @@ function openRanking() {
 /* ---------- モード切替 ---------- */
 function setAppMode(m) {
   state.mode = m;
+  if (m === "daily") ensureDailyGame();
   $("tabLevels").classList.toggle("on", m === "levels");
+  $("tabDaily").classList.toggle("on", m === "daily");
   $("tabEndless").classList.toggle("on", m === "endless");
   $("topbarLevels").style.display = m === "levels" ? "flex" : "none";
+  $("topbarDaily").style.display = m === "daily" ? "flex" : "none";
   $("topbarEndless").style.display = m === "endless" ? "flex" : "none";
   save();
   renderBoard();
   updateStatsUI();
+  if (currentGame().solved) showWinOverlay();
 }
 
 /* ---------- イベント登録 ---------- */
@@ -2119,8 +2292,11 @@ document.addEventListener("DOMContentLoaded", function () {
   initAds();
   if (currentGame().solved) showWinOverlay();
   if (isFirstLaunch) {
-    setTimeout(function () { toast("ようこそ！遊び方は右上の ⚙️ から確認できます"); }, 600);
+    $("welcomeModal").classList.add("open");
   }
+  $("btnCloseWelcome").addEventListener("click", function () { $("welcomeModal").classList.remove("open"); });
+  $("btnStartPlay").addEventListener("click", function () { $("welcomeModal").classList.remove("open"); });
+  $("welcomeModal").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
 
   var view = $("cellsView");
   $("board").addEventListener("pointerdown", boardPointerDown, { passive: false });
@@ -2256,7 +2432,20 @@ document.addEventListener("DOMContentLoaded", function () {
   $("btnHint").addEventListener("click", hint);
 
   $("tabLevels").addEventListener("click", function () { if (state.mode !== "levels") setAppMode("levels"); });
+  $("tabDaily").addEventListener("click", function () { if (state.mode !== "daily") setAppMode("daily"); });
   $("tabEndless").addEventListener("click", function () { if (state.mode !== "endless") setAppMode("endless"); });
+
+  $("soundOnBtn").addEventListener("click", function () {
+    state.sound = true;
+    save();
+    syncSoundButtons();
+    sfx("line");
+  });
+  $("soundOffBtn").addEventListener("click", function () {
+    state.sound = false;
+    save();
+    syncSoundButtons();
+  });
 
   document.querySelectorAll("#tierSeg .tier-btn").forEach(function (btn) {
     btn.addEventListener("click", function () {
