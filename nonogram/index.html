@@ -687,6 +687,91 @@ body.dpad-mode .bottombar { display: none; }
   box-shadow: 0 0 0 2px var(--bg);
 }
 
+/* デイリーカレンダー */
+.cal-stats {
+  display: flex;
+  gap: 8px;
+  margin: 4px 0 16px;
+}
+.cal-stats div {
+  flex: 1;
+  background: var(--card);
+  border-radius: 12px;
+  padding: 12px 4px;
+  text-align: center;
+}
+.cal-stats strong { display: block; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.cal-stats span { font-size: 10.5px; color: var(--text-sub); font-weight: 600; }
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.cal-head strong { font-size: 15px; }
+.cal-head button {
+  width: 40px; height: 36px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  background: var(--card2);
+  color: var(--text);
+  font-size: 18px;
+  font-family: inherit;
+  cursor: pointer;
+}
+.cal-head button:disabled { opacity: .3; }
+.cal-dow {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+  margin-bottom: 4px;
+}
+.cal-dow span { text-align: center; font-size: 11px; color: var(--text-sub); font-weight: 700; }
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.cal-cell {
+  aspect-ratio: 1;
+  border-radius: 9px;
+  border: 1.5px solid transparent;
+  background: var(--card2);
+  color: var(--text-sub);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  cursor: pointer;
+}
+.cal-cell.empty { background: transparent; cursor: default; }
+.cal-cell.future { opacity: .35; cursor: default; }
+.cal-cell.cleared { background: var(--primary); color: #fff; }
+.cal-cell.cleared .stamp { font-size: 12px; }
+.cal-cell.today { border-color: var(--gold); }
+.cal-cell .dnum { font-size: 10px; opacity: .85; }
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.badge {
+  background: var(--card);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 4px;
+  text-align: center;
+}
+.badge.locked { opacity: .4; filter: grayscale(1); }
+.badge .bico { font-size: 24px; }
+.badge .blabel { display: block; font-size: 10px; color: var(--text-sub); font-weight: 600; margin-top: 2px; }
+.badge .bnum { display: block; font-size: 9px; color: var(--text-sub); margin-top: 1px; }
+
 /* クリアモーダル */
 .win-sheet { padding: 30px 24px calc(24px + env(safe-area-inset-bottom)); text-align: center; }
 .win-emoji { font-size: 52px; }
@@ -762,7 +847,8 @@ body.dpad-mode .bottombar { display: none; }
     <button class="tbtn" id="btnLevelList" style="flex:0 0 66px;height:auto">📋 一覧</button>
   </div>
   <div class="topbar" id="topbarDaily" style="display:none">
-    <div class="tbtn" id="dailyInfo" style="display:flex;align-items:center;justify-content:center;cursor:default"></div>
+    <div class="tbtn" id="dailyInfo" style="display:flex;align-items:center;justify-content:center;cursor:default;font-size:12px"></div>
+    <button class="tbtn" id="btnCalendar" style="flex:0 0 96px">📅 カレンダー</button>
   </div>
   <div class="topbar" id="topbarEndless" style="display:none">
     <select class="size-select" id="sizeSelect">
@@ -854,6 +940,33 @@ body.dpad-mode .bottombar { display: none; }
   </div>
 </div>
 
+<!-- デイリーカレンダーモーダル -->
+<div class="modal" id="calModal">
+  <div class="sheet">
+    <div class="sheet-head">
+      <strong>📅 デイリーチャレンジ</strong>
+      <button class="sheet-close" id="btnCloseCal">✕</button>
+    </div>
+    <div class="sheet-body">
+      <div class="cal-stats">
+        <div><strong id="calStreak">0</strong><span>連続日数</span></div>
+        <div><strong id="calBest">0</strong><span>最長連続</span></div>
+        <div><strong id="calTotal">0</strong><span>累計クリア</span></div>
+      </div>
+      <div class="cal-head">
+        <button type="button" id="calPrev">‹</button>
+        <strong id="calMonthLabel"></strong>
+        <button type="button" id="calNext">›</button>
+      </div>
+      <div class="cal-dow"><span>日</span><span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span></div>
+      <div class="cal-grid" id="calGrid"></div>
+      <div class="card-title" style="margin-top:18px">獲得バッジ</div>
+      <div class="badge-grid" id="badgeGrid"></div>
+      <p class="hint-count" style="margin-top:10px">クリア済みの日はタップで見返せます。未クリアの過去の日は挑戦してカレンダーをうめましょう。</p>
+    </div>
+  </div>
+</div>
+
 <!-- ランキングモーダル -->
 <div class="modal" id="rankModal">
   <div class="sheet">
@@ -913,7 +1026,7 @@ body.dpad-mode .bottombar { display: none; }
           塗り方は2種類から選べます（画面下の 🎮／👆 ボタンでいつでも切替可能）。「手塗り」はマスの上を指でなぞって直接塗る方式です。「十字キー」は方向ボタンでカーソルを動かし「塗る」「印」ボタンで塗る方式で、<b>ボタンを押したまま十字キーを動かすと通ったマスを連続で塗れます</b>（ゲーム機のピクロスと同じ操作感。細かいマスでも正確に塗れます）。行や列が数字の通りに塗り終わると、残りのマスに自動で✕が付きます。<br><br>
           盤面右下の「＋／−」ボタンか、2本指のピンチ操作で盤面を拡大・縮小できます（⛶で全体表示に戻ります）。盤面が画面に収まらないときは、下と右のスクロールバーで移動できます。<br><br>
           すべての行と列の数字を満たすとクリアです。クリア後に「答え合わせ」で、お手本の絵との違いを確認できます。<br><br>
-          「レベル」では6段階の難易度で計1050問を用意（難易度が上がるほど問題数が増えます）。クリアした問題には✓が付き、達成状況が記録されます。「エンドレス」は好きなだけ無限に遊べるモードで、🏆からオンラインランキングに参加できます（Googleログイン・任意）。
+          「レベル」では6段階の難易度で計1050問を用意（難易度が上がるほど問題数が増えます）。クリアした問題には✓が付き、達成状況が記録されます。「毎日」は日替わりの問題で、クリアするとカレンダーにスタンプがたまり、連続日数や累計に応じてバッジを獲得できます（過去の日にもさかのぼって挑戦できます）。「エンドレス」は好きなだけ無限に遊べるモードで、🏆からオンラインランキングに参加できます（Googleログイン・任意）。
         </p>
       </div>
       <div class="card">
@@ -968,6 +1081,7 @@ body.dpad-mode .bottombar { display: none; }
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="ad-config.js"></script>
 
 <script>
 "use strict";
@@ -1116,7 +1230,7 @@ function defaultState() {
     mode: "levels",
     online: { nickname: "", seeded: false },
     endless: { sizeMode: "S", streak: 0, best: 0, totalCleared: 0, history: [], game: newGameStateFromPuzzle(buildPuzzle(5)) },
-    daily: { dateKey: "", game: null, streak: 0, lastClearDate: "", totalCleared: 0 },
+    daily: { playDate: "", game: null, cleared: {}, viewMonth: "" },
     levels: { tier: "S", cleared: {}, current: levelsCurrent }
   };
 }
@@ -1133,15 +1247,75 @@ function buildDailyPuzzle(dateKey) {
   var rng = mulberry32(seedFor("daily-" + dateKey, 1));
   return buildPuzzle(dailySizeFor(dateKey), rng, 0.5);
 }
-/* 日付が変わっていたら今日の問題に差し替える */
+/* 現在プレイ中の日付の問題を用意する（未指定なら今日） */
 function ensureDailyGame() {
-  var today = todayKey();
-  if (!state.daily.game || state.daily.dateKey !== today) {
-    state.daily.dateKey = today;
-    state.daily.game = newGameStateFromPuzzle(buildDailyPuzzle(today));
+  var target = state.daily.playDate || todayKey();
+  if (!state.daily.game || state.daily.game.dateKey !== target) {
+    state.daily.playDate = target;
+    var g = newGameStateFromPuzzle(buildDailyPuzzle(target));
+    g.dateKey = target;
+    // すでにクリア済みの日なら、絵を復元して完成状態で表示
+    if (state.daily.cleared[target]) {
+      for (var r = 0; r < g.puzzle.n; r++) {
+        for (var c = 0; c < g.puzzle.n; c++) {
+          if (g.puzzle.solution[r][c]) g.cells[r][c] = 1;
+        }
+      }
+      g.solved = true;
+      g.elapsed = state.daily.cleared[target].time || 0;
+    }
+    state.daily.game = g;
     save();
   }
 }
+/* 指定した日の問題に切り替える（過去日のさかのぼりプレイ用） */
+function goToDailyDate(dateKey) {
+  if (dateKey > todayKey()) { toast("未来の問題はまだ挑戦できません"); return; }
+  state.daily.playDate = dateKey;
+  state.daily.game = null;
+  ensureDailyGame();
+  renderBoard();
+  updateStatsUI();
+  if (currentGame().solved) showSolvedArt();
+}
+
+/* 連続クリア日数（今日から過去へさかのぼって連続でクリアしている日数） */
+function dailyStreak() {
+  var cleared = state.daily.cleared;
+  var d = new Date(todayKey() + "T00:00:00");
+  // 今日が未クリアなら、昨日までの連続を数える
+  if (!cleared[fmtDateKey(d)]) d.setDate(d.getDate() - 1);
+  var n = 0;
+  while (cleared[fmtDateKey(d)]) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+/* 過去最長の連続クリア日数 */
+function dailyBestStreak() {
+  var keys = Object.keys(state.daily.cleared).sort();
+  if (!keys.length) return 0;
+  var best = 1, run = 1;
+  for (var i = 1; i < keys.length; i++) {
+    var prev = new Date(keys[i - 1] + "T00:00:00");
+    prev.setDate(prev.getDate() + 1);
+    if (fmtDateKey(prev) === keys[i]) { run++; if (run > best) best = run; }
+    else run = 1;
+  }
+  return best;
+}
+function dailyTotal() {
+  var n = 0;
+  for (var k in state.daily.cleared) n++;
+  return n;
+}
+/* 積み上げバッジ（累計クリア数の節目） */
+var DAILY_BADGES = [
+  { n: 3, icon: "🌱", label: "はじめの一歩" },
+  { n: 7, icon: "⭐", label: "1週間達成" },
+  { n: 14, icon: "🔥", label: "2週間達成" },
+  { n: 30, icon: "🏅", label: "30問クリア" },
+  { n: 60, icon: "🏆", label: "60問クリア" },
+  { n: 100, icon: "👑", label: "100問の達人" }
+];
 
 function currentGame() {
   if (state.mode === "endless") return state.endless.game;
@@ -1160,7 +1334,13 @@ function load() {
         if (!parsed.inputMethod) parsed.inputMethod = "touch";
         if (!parsed.online) parsed.online = { nickname: "", seeded: false };
         if (parsed.sound == null) parsed.sound = true;
-        if (!parsed.daily) parsed.daily = { dateKey: "", game: null, streak: 0, lastClearDate: "", totalCleared: 0 };
+        // デイリー：旧形式（1日1問・カレンダーなし）から新形式へ移行
+        if (!parsed.daily) parsed.daily = { playDate: "", game: null, cleared: {}, viewMonth: "" };
+        if (!parsed.daily.cleared) {
+          var migrated = {};
+          if (parsed.daily.lastClearDate) migrated[parsed.daily.lastClearDate] = { time: 0 };
+          parsed.daily = { playDate: "", game: null, cleared: migrated, viewMonth: "" };
+        }
         if (parsed.mode !== "levels" && parsed.mode !== "endless" && parsed.mode !== "daily") parsed.mode = "levels";
         state = parsed;
         return;
@@ -1229,9 +1409,11 @@ function cellSizeFor(n) {
   if (n <= 25) return 20;
   return 16;
 }
-function todayKey() {
-  var d = new Date();
+function fmtDateKey(d) {
   return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+}
+function todayKey() {
+  return fmtDateKey(new Date());
 }
 function esc(s) {
   return String(s == null ? "" : s)
@@ -1776,16 +1958,31 @@ function onSolved() {
     if (state.endless.history.length > 3000) state.endless.history.shift();
     submitClearOnline();
   } else if (state.mode === "daily") {
-    var today = todayKey();
-    if (state.daily.lastClearDate !== today) {
-      var yest = new Date();
-      yest.setDate(yest.getDate() - 1);
-      var yestKey = yest.getFullYear() + "-" + String(yest.getMonth() + 1).padStart(2, "0") + "-" + String(yest.getDate()).padStart(2, "0");
-      state.daily.streak = (state.daily.lastClearDate === yestKey) ? state.daily.streak + 1 : 1;
-      state.daily.lastClearDate = today;
-      state.daily.totalCleared++;
+    var dk = g.dateKey || state.daily.playDate || todayKey();
+    var wasNew = !state.daily.cleared[dk];
+    var prevTotal = dailyTotal();
+    if (wasNew) {
+      state.daily.cleared[dk] = { time: g.elapsed };
+    } else if (g.elapsed < (state.daily.cleared[dk].time || 1e9)) {
+      state.daily.cleared[dk] = { time: g.elapsed };
     }
-    lastWinInfo = "🔥 デイリー連続 " + state.daily.streak + " 日目！また明日、新しい問題が届きます";
+    var streakNow = dailyStreak();
+    var newTotal = dailyTotal();
+    // バッジの節目を新しく超えたか
+    var earned = null;
+    if (wasNew) {
+      for (var bi = 0; bi < DAILY_BADGES.length; bi++) {
+        if (prevTotal < DAILY_BADGES[bi].n && newTotal >= DAILY_BADGES[bi].n) earned = DAILY_BADGES[bi];
+      }
+    }
+    if (earned) {
+      lastWinInfo = earned.icon + " バッジ獲得「" + earned.label + "」！　累計 " + newTotal + " 問クリア";
+      vibrate([40, 40, 80]);
+    } else if (dk === todayKey()) {
+      lastWinInfo = "🔥 デイリー連続 " + streakNow + " 日目！　累計 " + newTotal + " 問クリア";
+    } else {
+      lastWinInfo = "📅 " + Number(dk.slice(5, 7)) + "月" + Number(dk.slice(8, 10)) + "日をうめました！　累計 " + newTotal + " 問クリア";
+    }
   } else {
     var tier = state.levels.tier;
     var idx = state.levels.current[tier].idx;
@@ -1836,8 +2033,8 @@ function goNext() {
     return;
   }
   if (state.mode === "daily") {
-    // 日替わりは1日1問。完成した絵を眺められるようにそのまま残す
-    toast("今日の問題クリア！また明日🎉");
+    // カレンダーを開いて積み上げを見せる
+    openCalendar();
     return;
   }
   var tier = state.levels.tier;
@@ -1907,22 +2104,20 @@ function startTimer() {
 }
 
 /* ---------- 広告（AdSense）----------
-   広告を有効にするには、AdSenseで取得したパブリッシャーIDと広告ユニットIDを
-   下の2つの定数に設定してください。未設定の間、広告枠は表示されません。 */
-var AD_CLIENT = "";  // 例: "ca-pub-1234567890123456"
-var AD_SLOT = "";    // 例: "1234567890"
-
+   広告の有効化は ad-config.js の client / slot を書き換えるだけ。
+   未設定の間は広告枠を出さない（レイアウトにも影響なし）。 */
 function initAds() {
-  if (!AD_CLIENT || !AD_SLOT) return;
+  var cfg = window.AD_CONFIG || {};
+  if (!cfg.client || !cfg.slot) return;
   var bar = $("adBar");
   bar.style.display = "block";
   bar.innerHTML =
     '<ins class="adsbygoogle" style="display:block;height:60px"' +
-    ' data-ad-client="' + AD_CLIENT + '" data-ad-slot="' + AD_SLOT + '"' +
+    ' data-ad-client="' + cfg.client + '" data-ad-slot="' + cfg.slot + '"' +
     ' data-ad-format="horizontal" data-full-width-responsive="false"></ins>';
   var s = document.createElement("script");
   s.async = true;
-  s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + AD_CLIENT;
+  s.src = "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=" + cfg.client;
   s.crossOrigin = "anonymous";
   s.onload = function () {
     try { (window.adsbygoogle = window.adsbygoogle || []).push({}); } catch (e) {}
@@ -1953,11 +2148,13 @@ function updateStatsUI() {
     $("sizeSelect").value = state.endless.sizeMode;
   } else if (state.mode === "daily") {
     $("statStreakLabel").textContent = "連続日数";
-    $("statStreak").textContent = state.daily.streak;
+    $("statStreak").textContent = dailyStreak();
     $("statBestLabel").textContent = "累計";
-    $("statBest").textContent = state.daily.totalCleared;
-    var p = state.daily.dateKey.split("-");
-    $("dailyInfo").textContent = "📅 " + Number(p[1]) + "月" + Number(p[2]) + "日の問題（" + g.puzzle.n + "×" + g.puzzle.n + "）" + (g.solved ? "　✓クリア済み" : "");
+    $("statBest").textContent = dailyTotal();
+    var dk = g.dateKey || state.daily.playDate || todayKey();
+    var isToday = dk === todayKey();
+    $("dailyInfo").textContent = "📅 " + Number(dk.slice(5, 7)) + "月" + Number(dk.slice(8, 10)) + "日" +
+      (isToday ? "（今日）" : "") + " " + g.puzzle.n + "×" + g.puzzle.n + (g.solved ? "　✓クリア済" : "");
   } else {
     var tier = state.levels.tier;
     var t = tierByKey(tier);
@@ -1986,8 +2183,8 @@ function showWinOverlay() {
     $("btnNext").textContent = "つぎへ進む";
   } else if (state.mode === "daily") {
     $("winStreakLabel").textContent = "連続日数";
-    $("winStreak").textContent = state.daily.streak;
-    $("btnNext").textContent = "OK（また明日！）";
+    $("winStreak").textContent = dailyStreak();
+    $("btnNext").textContent = "カレンダーを見る";
   } else {
     var tier = state.levels.tier, t = tierByKey(tier);
     $("winStreakLabel").textContent = "達成";
@@ -2056,6 +2253,91 @@ function openLevelList(tierKey) {
     if (!cur) cur = document.querySelector("#levelGrid .level-cell:not(.cleared)");
     if (cur) cur.scrollIntoView({ block: "center" });
   }, 60);
+}
+
+/* ---------- デイリーカレンダー ---------- */
+var calViewMonth = ""; // "YYYY-MM"
+
+function renderCalendar() {
+  $("calStreak").textContent = dailyStreak();
+  $("calBest").textContent = dailyBestStreak();
+  $("calTotal").textContent = dailyTotal();
+
+  var parts = calViewMonth.split("-");
+  var year = Number(parts[0]), month = Number(parts[1]) - 1; // 0-indexed
+  $("calMonthLabel").textContent = year + "年" + (month + 1) + "月";
+
+  // 前月・次月ボタンの活性（未来の月へは進めない）
+  var thisMonth = todayKey().slice(0, 7);
+  $("calNext").disabled = calViewMonth >= thisMonth;
+
+  var grid = $("calGrid");
+  grid.innerHTML = "";
+  var first = new Date(year, month, 1);
+  var startDow = first.getDay();
+  var daysInMonth = new Date(year, month + 1, 0).getDate();
+  var today = todayKey();
+
+  var i;
+  for (i = 0; i < startDow; i++) {
+    var blank = document.createElement("div");
+    blank.className = "cal-cell empty";
+    grid.appendChild(blank);
+  }
+  for (var day = 1; day <= daysInMonth; day++) {
+    (function (day) {
+      var dk = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(day).padStart(2, "0");
+      var cell = document.createElement("div");
+      cell.className = "cal-cell";
+      var isFuture = dk > today;
+      var isToday = dk === today;
+      var isCleared = !!state.daily.cleared[dk];
+      if (isFuture) cell.classList.add("future");
+      if (isToday) cell.classList.add("today");
+      if (isCleared) {
+        cell.classList.add("cleared");
+        cell.innerHTML = '<span class="stamp">⭐</span><span class="dnum">' + day + '</span>';
+      } else {
+        cell.textContent = day;
+      }
+      if (!isFuture) {
+        cell.addEventListener("click", function () {
+          $("calModal").classList.remove("open");
+          if (state.mode !== "daily") setAppMode("daily");
+          goToDailyDate(dk);
+        });
+      }
+      grid.appendChild(cell);
+    })(day);
+  }
+
+  // バッジ
+  var bg = $("badgeGrid");
+  bg.innerHTML = "";
+  var total = dailyTotal();
+  for (i = 0; i < DAILY_BADGES.length; i++) {
+    var b = DAILY_BADGES[i];
+    var el = document.createElement("div");
+    el.className = "badge" + (total >= b.n ? "" : " locked");
+    el.innerHTML = '<div class="bico">' + b.icon + '</div>' +
+      '<span class="blabel">' + b.label + '</span>' +
+      '<span class="bnum">' + b.n + '問</span>';
+    bg.appendChild(el);
+  }
+}
+
+function openCalendar() {
+  calViewMonth = todayKey().slice(0, 7);
+  renderCalendar();
+  $("calModal").classList.add("open");
+}
+function calShiftMonth(delta) {
+  var parts = calViewMonth.split("-");
+  var d = new Date(Number(parts[0]), Number(parts[1]) - 1 + delta, 1);
+  var nm = d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0");
+  if (nm > todayKey().slice(0, 7)) return; // 未来の月へは行かない
+  calViewMonth = nm;
+  renderCalendar();
 }
 
 /* ---------- オンラインランキング（Firebase） ---------- */
@@ -2468,6 +2750,12 @@ document.addEventListener("DOMContentLoaded", function () {
   $("btnLevelList").addEventListener("click", function () { openLevelList(state.levels.tier); });
   $("btnCloseLevelList").addEventListener("click", function () { $("levelListModal").classList.remove("open"); });
   $("levelListModal").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+
+  $("btnCalendar").addEventListener("click", openCalendar);
+  $("btnCloseCal").addEventListener("click", function () { $("calModal").classList.remove("open"); });
+  $("calModal").addEventListener("click", function (e) { if (e.target === this) this.classList.remove("open"); });
+  $("calPrev").addEventListener("click", function () { calShiftMonth(-1); });
+  $("calNext").addEventListener("click", function () { calShiftMonth(1); });
 
   $("btnRanking").addEventListener("click", openRanking);
   $("btnCloseRank").addEventListener("click", function () { $("rankModal").classList.remove("open"); });
