@@ -9,6 +9,6 @@
  *   window.AD_CONFIG = { client: "ca-pub-1234567890123456", slot: "1234567890" };
  */
 window.AD_CONFIG = {
-  client: "",
-  slot: ""
+  client: "ca-pub-6371653295815440",
+  slot: "1802122089"
 };
