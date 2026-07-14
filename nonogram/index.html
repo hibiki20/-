@@ -1081,6 +1081,7 @@ body.dpad-mode .bottombar { display: none; }
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
 <script src="ad-config.js"></script>
 
 <script>
@@ -2477,15 +2478,10 @@ var currentRankRange = "day";
 
 function initFirebase() {
   if (typeof firebase === "undefined") return; // オフライン時などはランキングなしで動作
+  var cfg = window.FIREBASE_CONFIG;
+  if (!cfg || !cfg.apiKey) return; // 設定未投入ならランキングなしで動作
   try {
-    firebase.initializeApp({
-      apiKey: "AIzaSyDEYnw2FapZ_fXzv_n6crB-cjGgJF2lMcM",
-      authDomain: "sakumo-app.firebaseapp.com",
-      projectId: "sakumo-app",
-      storageBucket: "sakumo-app.firebasestorage.app",
-      messagingSenderId: "571412680393",
-      appId: "1:571412680393:web:c3a98b0e19485e37768718"
-    });
+    firebase.initializeApp(cfg);
     fbDb = firebase.firestore();
     firebase.auth().onAuthStateChanged(function (user) {
       fbUser = user;
@@ -2593,7 +2589,7 @@ function renderRankAuth() {
     wrap.innerHTML =
       '<div class="card" style="margin-bottom:0">' +
         '<p class="hint-count" style="margin-bottom:10px">Googleでログインすると、世界中のプレイヤーとエンドレスのクリア数を競うオンラインランキングに参加できます。送信されるのはニックネームとクリア数だけです。</p>' +
-        '<p class="hint-count" style="margin-bottom:10px;color:var(--text-sub)">※ ログイン画面に <b>sakumo-app.firebaseapp.com</b> と表示されますが、これは本アプリのランキング用サーバー（Firebase）のアドレスです。安心してご利用ください。</p>' +
+        '<p class="hint-count" style="margin-bottom:10px;color:var(--text-sub)">※ ログイン画面に <b>' + esc((window.FIREBASE_CONFIG && window.FIREBASE_CONFIG.authDomain) || "") + '</b> と表示されますが、これは本アプリのランキング用サーバー（Firebase）のアドレスです。安心してご利用ください。</p>' +
         '<button class="btn btn-primary" id="btnRankLogin" style="height:44px">Googleでログインして参加</button>' +
       '</div>';
     var b = $("btnRankLogin");
