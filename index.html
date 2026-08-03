@@ -189,6 +189,49 @@ body.dark .tpl-chip.del { background: #3a2226; }
   line-height: 1.7;
   margin-bottom: 12px;
 }
+.save-note {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sub);
+  margin-top: 14px;
+  transition: color .2s;
+}
+.save-note.saved { color: var(--primary); }
+
+/* 自社情報が未登録のときの注意バナー */
+.warn-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff5e6;
+  border: 1.5px solid #f0b866;
+  border-radius: var(--radius);
+  padding: 13px 14px;
+  margin-bottom: 14px;
+}
+.warn-banner p {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #8a5a12;
+  line-height: 1.6;
+}
+.warn-banner button {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: #8a5a12;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+body.dark .warn-banner { background: #3a2f18; border-color: #7a5a20; }
+body.dark .warn-banner p { color: #f0c98a; }
+body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
 
 /* 入力方法切替 */
 .seg { display: flex; gap: 8px; }
@@ -548,6 +591,10 @@ body.dark .tpl-chip.del { background: #3a2226; }
         <button type="button" class="btn-mini" id="btnExitEdit" style="background:rgba(255,255,255,.25);color:#fff;border-color:transparent;flex-shrink:0">編集を中止</button>
       </div>
     </div>
+    <div class="warn-banner" id="noCompanyBanner" style="display:none">
+      <p>自社情報が未登録です。このままだと差出人の欄が空欄の書類になります。</p>
+      <button type="button" id="btnGoSettings">登録する</button>
+    </div>
     <div class="card">
       <div class="card-title">基本情報</div>
       <div class="field">
@@ -691,14 +738,14 @@ body.dark .tpl-chip.del { background: #3a2226; }
     </div>
     <div class="card">
       <div class="card-title">自社情報（帳票に印字されます）</div>
-      <div class="field"><label>会社名・屋号</label><input type="text" id="setName"></div>
+      <div class="field"><label>会社名・屋号</label><input type="text" id="setName" placeholder="○○塗装工業"></div>
       <div class="field"><label>郵便番号</label><input type="text" id="setZip" placeholder="000-0000"></div>
       <div class="field"><label>住所</label><input type="text" id="setAddress"></div>
       <div class="field"><label>電話番号</label><input type="text" id="setPhone" inputmode="tel"></div>
       <div class="field"><label>代表者名</label><input type="text" id="setRep"></div>
-      <div class="field"><label>振込先（任意）</label><input type="text" id="setBank" placeholder="○○銀行 ○○支店 普通 0000000"></div>
+      <div class="field"><label>振込先（請求書に印字されます）</label><input type="text" id="setBank" placeholder="○○銀行 ○○支店 普通 0000000"></div>
+      <p class="save-note" id="settingsSaveNote">入力した内容は自動で保存されます</p>
     </div>
-    <button class="btn btn-primary" id="btnSaveSettings">設定を保存</button>
 
     <div class="card" style="margin-top:14px">
       <div class="card-title">クラウド同期</div>
@@ -910,6 +957,7 @@ function importBackup(file) {
       applyDisplaySettings();
       renderTemplateChips();
       fillSettingsForm();
+      updateCompanyWarning();
       toast("データを復元しました");
     } catch (err) {
       toast("復元に失敗しました。ファイルを確認してください");
@@ -945,15 +993,18 @@ var titles = {
   list: ["書類一覧", "保存した書類を表示・出力できます"],
   settings: ["設定", "自社情報を登録してください"]
 };
+function settingsSubtitle() {
+  return settings.name ? "自社情報・表示・同期を変更できます" : "自社情報を登録してください";
+}
 function hasUnsavedInput() {
   return items.length > 0 ||
     $("customerName").value.trim() !== "" ||
     $("projectName").value.trim() !== "";
 }
 
-function showScreen(name) {
+function showScreen(name, skipConfirm) {
   var current = document.querySelector(".screen.active").id.replace("screen-", "");
-  if (current === "create" && name !== "create" && hasUnsavedInput()) {
+  if (!skipConfirm && current === "create" && name !== "create" && hasUnsavedInput()) {
     if (!confirm("入力中の内容があります。保存せずに移動しますか？")) return;
   }
 
@@ -970,11 +1021,12 @@ function showScreen(name) {
     $("headerSub").textContent = "内容を修正して保存できます";
   } else {
     $("headerTitle").textContent = titles[name][0];
-    $("headerSub").textContent = titles[name][1];
+    $("headerSub").textContent = name === "settings" ? settingsSubtitle() : titles[name][1];
   }
 
   if (name === "list") renderDocList();
   if (name === "settings") fillSettingsForm();
+  if (name === "create") updateCompanyWarning();
   document.querySelector(".app").scrollTop = 0;
 }
 
@@ -1249,6 +1301,13 @@ function buildDocFromForm() {
   if (!customer) { toast("宛先を入力してください"); return null; }
   if (!project) { toast("件名を入力してください"); return null; }
   if (!items.length) { toast("明細を1件以上追加してください"); return null; }
+  if (!settings.name) {
+    if (!confirm("自社情報が未登録のため、差出人の欄が空欄の書類になります。\nこのまま進めますか？\n\n「キャンセル」を選ぶと設定画面を開きます。")) {
+      showScreen("settings", true);
+      $("setName").focus();
+      return null;
+    }
+  }
   var c = calc();
   addHistory("inv_customers", customer);
   addHistory("inv_projects", project);
@@ -1565,7 +1624,14 @@ function fillSettingsForm() {
   $("setPhone").value = settings.phone || "";
   $("setRep").value = settings.rep || "";
   $("setBank").value = settings.bank || "";
+  clearTimeout(settingsSaveTimer);
+  $("settingsSaveNote").textContent = "入力した内容は自動で保存されます";
+  $("settingsSaveNote").classList.remove("saved");
 }
+
+/* 自社情報は表示設定と同じく入力するそばから保存する（保存し忘れによる消失を防ぐ） */
+var settingsSaveTimer = null;
+
 function saveSettings() {
   settings = {
     name: $("setName").value.trim(),
@@ -1576,7 +1642,28 @@ function saveSettings() {
     bank: $("setBank").value.trim()
   };
   persistSettings();
-  toast("設定を保存しました");
+  updateCompanyWarning();
+}
+
+function scheduleSettingsSave() {
+  clearTimeout(settingsSaveTimer);
+  var note = $("settingsSaveNote");
+  note.textContent = "入力中…";
+  note.classList.remove("saved");
+  settingsSaveTimer = setTimeout(function() {
+    saveSettings();
+    note.textContent = "✓ 保存しました";
+    note.classList.add("saved");
+    setTimeout(function() {
+      note.textContent = "入力した内容は自動で保存されます";
+      note.classList.remove("saved");
+    }, 2000);
+  }, 600);
+}
+
+/* 自社情報が未登録なら作成画面で知らせる（差出人が空欄の書類を防ぐ） */
+function updateCompanyWarning() {
+  $("noCompanyBanner").style.display = settings.name ? "none" : "flex";
 }
 
 /* ---------- クラウド同期（Firebase） ---------- */
@@ -1693,6 +1780,7 @@ function mergeState(cloud) {
   renderHistory("inv_customers", "customerHistory");
   renderHistory("inv_projects", "projectHistory");
   fillSettingsForm();
+  updateCompanyWarning();
 }
 
 function pullFromCloud() {
@@ -1806,7 +1894,16 @@ document.addEventListener("DOMContentLoaded", function() {
     if (e.target === this) closePreview();
   });
 
-  $("btnSaveSettings").addEventListener("click", saveSettings);
+  var setFields = ["setName", "setZip", "setAddress", "setPhone", "setRep", "setBank"];
+  for (var s = 0; s < setFields.length; s++) {
+    $(setFields[s]).addEventListener("input", scheduleSettingsSave);
+  }
+  $("btnGoSettings").addEventListener("click", function() {
+    showScreen("settings", true);
+    $("setName").focus();
+  });
+  updateCompanyWarning();
+
   $("docSearch").addEventListener("input", renderDocList);
   $("docSort").addEventListener("change", renderDocList);
 
