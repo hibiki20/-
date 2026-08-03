@@ -200,6 +200,8 @@ body.dark .unit-chips .tpl-chip.on { background: #24284a; }
   margin-right: 6px;
   vertical-align: 1px;
 }
+.big-badge.tax { color: #b8730a; border-color: #b8730a; }
+body.dark .big-badge.tax { color: #f0b866; border-color: #f0b866; }
 .sync-note {
   font-size: 12px;
   color: var(--text-sub);
@@ -388,6 +390,14 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   font-size: 14px;
   color: var(--text-sub);
 }
+.discount-warn {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--danger);
+  text-align: right;
+  padding: 2px 0 4px;
+  line-height: 1.5;
+}
 .total-line.grand {
   border-top: 2px solid var(--text);
   margin-top: 8px;
@@ -542,7 +552,8 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
 .paper th, .paper td { border: 1px solid #000; padding: 7px 8px; color: #000; }
 .paper th { background: #e4e4e4; font-weight: 700; text-align: center; }
 .paper td.num { text-align: right; white-space: nowrap; }
-.paper .p-sum { margin-top: 12px; margin-left: auto; width: 100%; max-width: 220px; font-size: 12px; color: #000; }
+.paper .p-note { margin-top: 6px; font-size: 10.5px; color: #000; }
+.paper .p-sum { margin-top: 12px; margin-left: auto; width: 100%; max-width: 290px; font-size: 12px; color: #000; }
 .paper .p-sum div { display: flex; justify-content: space-between; padding: 3px 0; }
 .paper .p-sum .g { border-top: 1.5px solid #000; margin-top: 4px; padding-top: 7px; font-weight: 800; font-size: 13.5px; }
 .paper .p-remarks {
@@ -692,12 +703,13 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
         <datalist id="projectHistory"></datalist>
       </div>
       <div class="field">
-        <label for="taxRate">消費税率</label>
+        <label for="taxRate">消費税率（既定）</label>
         <select id="taxRate">
           <option value="10">10%（標準税率）</option>
           <option value="8">8%（軽減税率）</option>
           <option value="0">0%（非課税）</option>
         </select>
+        <p style="font-size:11px;color:var(--text-sub);margin-top:6px">明細ごとに違う税率をつけることもできます</p>
       </div>
     </div>
 
@@ -746,6 +758,14 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
         <label for="itemAmount">金額（一式）</label>
         <input type="number" id="itemAmount" placeholder="50000" inputmode="numeric">
       </div>
+      <div class="field" id="itemTaxField">
+        <label>この明細の消費税</label>
+        <div class="seg" role="group" aria-label="この明細の消費税">
+          <button type="button" class="seg-btn on" id="itemTax10">10%</button>
+          <button type="button" class="seg-btn" id="itemTax8">8%軽減</button>
+          <button type="button" class="seg-btn" id="itemTax0">非課税</button>
+        </div>
+      </div>
       <label class="chk-row">
         <input type="checkbox" id="itemBig">
         <span>この項目を大きく強調して印字する</span>
@@ -761,11 +781,12 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
       <div id="itemsList"></div>
       <div style="margin-top:10px">
         <div class="total-line"><span>小計</span><span id="sumSubtotal">¥0</span></div>
-        <div class="total-line"><span id="taxLabel">消費税（10%）</span><span id="sumTax">¥0</span></div>
+        <div id="taxLines"></div>
         <div class="total-line" style="gap:12px">
           <span>値引き</span>
-          <input type="number" id="discount" placeholder="0" inputmode="numeric" aria-label="値引き額" style="width:130px;height:38px;text-align:right">
+          <input type="number" id="discount" placeholder="0" inputmode="numeric" min="0" aria-label="値引き額" style="width:130px;height:38px;text-align:right">
         </div>
+        <p class="discount-warn" id="discountWarn" style="display:none"></p>
         <div class="total-line grand"><span>合計</span><span id="sumTotal">¥0</span></div>
       </div>
     </div>
@@ -1161,13 +1182,58 @@ function showScreen(name, skipConfirm) {
 }
 
 /* ---------- 明細 ---------- */
+
+/* 明細は自前の税率を持てる。持っていなければ書類の既定税率に従う */
+function itemRate(it, docRate) {
+  return it.taxRate != null ? it.taxRate : docRate;
+}
+
+/* 税率ごとに対価の額と消費税額を集計する（8%と10%の混在に対応） */
+function taxBreakdown(itemList, docRate) {
+  var base = {};
+  var rates = [];
+  for (var i = 0; i < itemList.length; i++) {
+    var it = itemList[i];
+    if (it.detail) continue; // 内訳行は金額を持たない
+    var r = itemRate(it, docRate);
+    if (base[r] === undefined) { base[r] = 0; rates.push(r); }
+    base[r] += it.amount;
+  }
+  rates.sort(function(a, b) { return b - a; }); // 10% → 8% → 非課税 の順
+  var out = [];
+  for (var j = 0; j < rates.length; j++) {
+    out.push({ rate: rates[j], base: base[rates[j]], tax: Math.floor(base[rates[j]] * rates[j] / 100) });
+  }
+  return out;
+}
+
+/* 保存済み書類にも税率ごとの内訳を使わせる（古い書類は書類単位の税率から復元） */
+function docBreakdown(doc) {
+  if (doc.taxBreakdown && doc.taxBreakdown.length) return doc.taxBreakdown;
+  return [{ rate: doc.taxRate != null ? doc.taxRate : 10, base: doc.subtotal, tax: doc.tax }];
+}
+
 function calc() {
-  var subtotal = 0;
-  for (var i = 0; i < items.length; i++) subtotal += items[i].amount;
-  var rate = Number($("taxRate").value) / 100;
-  var tax = Math.floor(subtotal * rate);
-  var discount = Number($("discount").value) || 0;
-  return { subtotal: subtotal, tax: tax, taxRate: Number($("taxRate").value), discount: discount, total: subtotal + tax - discount };
+  var docRate = Number($("taxRate").value);
+  var breakdown = taxBreakdown(items, docRate);
+  var subtotal = 0, tax = 0;
+  for (var i = 0; i < breakdown.length; i++) {
+    subtotal += breakdown[i].base;
+    tax += breakdown[i].tax;
+  }
+  var requested = Math.round(Number($("discount").value) || 0);
+  var maxDiscount = subtotal + tax;
+  var discount = Math.min(Math.max(requested, 0), maxDiscount);
+  return {
+    subtotal: subtotal,
+    tax: tax,
+    taxRate: docRate,
+    breakdown: breakdown,
+    discount: discount,
+    discountRequested: requested,
+    maxDiscount: maxDiscount,
+    total: subtotal + tax - discount
+  };
 }
 
 function renderItems() {
@@ -1186,6 +1252,10 @@ function renderItems() {
       if (it.detail) nameStyle += "font-weight:400;color:var(--text-sub);";
       if (it.big) nameStyle += "font-size:17px;font-weight:800;";
       var badge = it.big ? '<span class="big-badge">強調</span>' : "";
+      // 既定と違う税率のものだけ印をつける（全部に出すとうるさいため）
+      if (!it.detail && it.taxRate != null && it.taxRate !== docTaxRate()) {
+        badge = '<span class="big-badge tax">' + esc(rateLabel(it.taxRate)) + "</span>" + badge;
+      }
       row.innerHTML =
         '<div class="item-top">' +
           '<div class="item-main"' + (it.detail ? ' style="padding-left:16px"' : "") + '>' +
@@ -1247,12 +1317,42 @@ function renderItems() {
   updateSummary();
 }
 
+function rateLabel(rate) {
+  if (rate === 8) return "8%（軽減）";
+  if (rate === 0) return "非課税";
+  return rate + "%";
+}
+
 function updateSummary() {
   var c = calc();
-  $("taxLabel").textContent = "消費税（" + c.taxRate + "%）";
   $("sumSubtotal").textContent = yen(c.subtotal);
-  $("sumTax").textContent = yen(c.tax);
   $("sumTotal").textContent = yen(c.total);
+
+  // 値引きが税込合計を超えるとマイナスの書類になってしまうので、その場で知らせる
+  var warn = $("discountWarn");
+  if (c.discountRequested > c.maxDiscount) {
+    warn.textContent = "値引きは " + yen(c.maxDiscount) + " までです（" + yen(c.maxDiscount) + " として計算しています）";
+    warn.style.display = "block";
+  } else if (c.discountRequested < 0) {
+    warn.textContent = "値引きにマイナスは入力できません";
+    warn.style.display = "block";
+  } else {
+    warn.style.display = "none";
+  }
+
+  // 税率が1つだけなら従来どおり1行、混在していれば税率ごとに分けて出す
+  var wrap = $("taxLines");
+  wrap.innerHTML = "";
+  var bd = c.breakdown.length ? c.breakdown : [{ rate: c.taxRate, base: 0, tax: 0 }];
+  for (var i = 0; i < bd.length; i++) {
+    var line = document.createElement("div");
+    line.className = "total-line";
+    var left = bd.length > 1
+      ? rateLabel(bd[i].rate) + "対象 " + yen(bd[i].base) + " の消費税"
+      : "消費税（" + rateLabel(bd[i].rate) + "）";
+    line.innerHTML = "<span>" + esc(left) + "</span><span>" + yen(bd[i].tax) + "</span>";
+    wrap.appendChild(line);
+  }
 }
 
 var inputMode = "qty";
@@ -1273,12 +1373,27 @@ function setMode(mode) {
 function setDetailMode(on) {
   $("modeDetailChk").checked = on;
   $("amountModeField").style.display = on ? "none" : "block";
+  $("itemTaxField").style.display = on ? "none" : "block"; // 内訳行に税率はない
   if (on) {
     $("qtyFields").style.display = "none";
     $("lumpRow").style.display = "none";
   } else {
     setMode(inputMode);
   }
+}
+
+/* 明細に付ける税率。書類の既定と同じなら item には持たせず、既定の変更に追従させる */
+var itemTaxRate = 10;
+
+function setItemTax(rate) {
+  itemTaxRate = rate;
+  $("itemTax10").classList.toggle("on", rate === 10);
+  $("itemTax8").classList.toggle("on", rate === 8);
+  $("itemTax0").classList.toggle("on", rate === 0);
+}
+
+function docTaxRate() {
+  return Number($("taxRate").value);
 }
 
 function addItem() {
@@ -1301,6 +1416,8 @@ function addItem() {
     obj = { name: name, qty: qty, unit: unit, price: price, amount: Math.round(qty * price) };
   }
   if ($("itemBig").checked) obj.big = true;
+  // 既定と同じ税率なら持たせない（あとで既定を変えたときに一緒に変わってほしいため）
+  if (!obj.detail && itemTaxRate !== docTaxRate()) obj.taxRate = itemTaxRate;
 
   if (editingIndex >= 0) {
     items[editingIndex] = obj;
@@ -1323,6 +1440,7 @@ function clearItemForm() {
   $("itemAmount").value = "";
   $("itemBig").checked = false;
   renderUnitChips();
+  setItemTax(docTaxRate());
 }
 
 function startEdit(idx) {
@@ -1333,6 +1451,7 @@ function startEdit(idx) {
   else setMode(it.lump ? "lump" : "qty");
   $("itemName").value = it.name;
   $("itemBig").checked = !!it.big;
+  if (!it.detail) setItemTax(itemRate(it, docTaxRate()));
   if (it.lump) $("itemAmount").value = it.amount;
   if (!it.lump && !it.detail) {
     $("itemQty").value = it.qty;
@@ -1487,6 +1606,7 @@ function buildDocFromForm() {
     subtotal: c.subtotal,
     tax: c.tax,
     taxRate: c.taxRate,
+    taxBreakdown: JSON.parse(JSON.stringify(c.breakdown)),
     discount: c.discount,
     total: c.total
   };
@@ -1506,6 +1626,7 @@ function clearForm() {
   $("discount").value = "";
   $("taxRate").value = "10";
   $("docDate").value = todayStr();
+  setItemTax(10);
   renderHistory("inv_customers", "customerHistory");
   renderHistory("inv_projects", "projectHistory");
   renderItems();
@@ -1531,11 +1652,22 @@ function slashDate(iso) {
 }
 
 function paperHTML(doc) {
+  var bd = docBreakdown(doc);
+  var mixed = bd.length > 1;
+  var docRate = doc.taxRate != null ? doc.taxRate : 10;
+  var hasReduced = false;
+
   var rows = "";
   for (var i = 0; i < doc.items.length; i++) {
     var it = doc.items[i];
     var bigName = it.big ? "font-size:1.35em;font-weight:700;" : "";
     var bigAmt = it.big ? "font-size:1.2em;font-weight:700;" : "";
+    // 税率が混在する書類では、軽減税率の行がどれか分かるよう※を付ける
+    var mark = "";
+    if (mixed && !it.detail && itemRate(it, docRate) === 8) {
+      mark = "※";
+      hasReduced = true;
+    }
     if (it.detail) {
       rows +=
         "<tr>" +
@@ -1545,7 +1677,7 @@ function paperHTML(doc) {
     } else if (it.lump) {
       rows +=
         "<tr>" +
-          "<td" + (bigName ? ' style="' + bigName + '"' : "") + ">" + esc(it.name) + "</td>" +
+          "<td" + (bigName ? ' style="' + bigName + '"' : "") + ">" + mark + esc(it.name) + "</td>" +
           '<td class="num"></td>' +
           '<td class="num">一式</td>' +
           '<td class="num"' + (bigAmt ? ' style="' + bigAmt + '"' : "") + '>' + yen(it.amount) + "</td>" +
@@ -1553,7 +1685,7 @@ function paperHTML(doc) {
     } else {
       rows +=
         "<tr>" +
-          "<td" + (bigName ? ' style="' + bigName + '"' : "") + ">" + esc(it.name) + "</td>" +
+          "<td" + (bigName ? ' style="' + bigName + '"' : "") + ">" + mark + esc(it.name) + "</td>" +
           '<td class="num">' + esc(it.qty) + (it.unit ? " " + esc(it.unit) : "") + "</td>" +
           '<td class="num">' + yen(it.price) + "</td>" +
           '<td class="num"' + (bigAmt ? ' style="' + bigAmt + '"' : "") + '>' + yen(it.amount) + "</td>" +
@@ -1572,6 +1704,22 @@ function paperHTML(doc) {
   if (doc.discount > 0) {
     discountLine = "<div><span>値引き</span><span>-¥" + Number(doc.discount).toLocaleString("ja-JP") + "</span></div>";
   }
+
+  // 税率ごとの対価の額と消費税額。1種類だけなら従来どおり1行で出す
+  var taxLines = "";
+  if (mixed) {
+    for (var b = 0; b < bd.length; b++) {
+      taxLines +=
+        "<div><span>" + esc(rateLabel(bd[b].rate)) + "対象　" + yen(bd[b].base) + "</span>" +
+        "<span>消費税 " + yen(bd[b].tax) + "</span></div>";
+    }
+  } else {
+    taxLines = "<div><span>消費税（" + esc(rateLabel(bd[0].rate)) + "）</span><span>" + yen(doc.tax) + "</span></div>";
+  }
+
+  var reducedNote = hasReduced
+    ? '<div class="p-note">※印は軽減税率（8%）対象です</div>'
+    : "";
 
   var remarksHTML = "";
   if (doc.type === "請求書") {
@@ -1593,9 +1741,10 @@ function paperHTML(doc) {
     '<div class="p-project">工事件名：　' + esc(doc.project) + "</div>" +
     "<table><thead><tr><th>内　容</th><th>数量</th><th>単価</th><th>金額</th></tr></thead>" +
     "<tbody>" + rows + "</tbody></table>" +
+    reducedNote +
     '<div class="p-sum">' +
       "<div><span>小計</span><span>" + yen(doc.subtotal) + "</span></div>" +
-      "<div><span>消費税（" + (doc.taxRate != null ? doc.taxRate : 10) + "%）</span><span>" + yen(doc.tax) + "</span></div>" +
+      taxLines +
       discountLine +
       '<div class="g"><span>合計</span><span>' + yen(doc.total) + "</span></div>" +
     "</div>" +
@@ -1660,14 +1809,16 @@ function updateEditBanner() {
   }
 }
 
-function editDocument(idx) {
+/* asNew = true なら「複製」。同じ内容を新しい書類として作成画面に読み込む
+   （保存すると元の書類とは別に登録される） */
+function editDocument(idx, asNew) {
   var d = documents[idx];
   if (!d) return;
-  editingDocIndex = idx;
+  editingDocIndex = asNew ? -1 : idx;
   editingIndex = -1;
 
   $("docType").value = d.type;
-  $("docDate").value = d.date || todayStr();
+  $("docDate").value = asNew ? todayStr() : (d.date || todayStr());
   $("customerName").value = d.customer || "";
   $("projectName").value = d.project || "";
   $("taxRate").value = String(d.taxRate != null ? d.taxRate : 10);
@@ -1683,7 +1834,8 @@ function editDocument(idx) {
 
   renderItems();
   updateEditBanner();
-  showScreen("create");
+  showScreen("create", true);
+  if (asNew) toast("複製しました。内容を直して保存してください");
 }
 
 function exitEditDoc() {
@@ -1754,6 +1906,12 @@ function renderDocList() {
       bEdit.textContent = "編集";
       bEdit.onclick = function() { editDocument(realIdx); };
       btns.appendChild(bEdit);
+
+      var bCopy = document.createElement("button");
+      bCopy.className = "btn btn-sm btn-ghost";
+      bCopy.textContent = "複製";
+      bCopy.onclick = function() { editDocument(realIdx, true); };
+      btns.appendChild(bCopy);
 
       if (d.type === "見積書") {
         var bConv = document.createElement("button");
@@ -2004,7 +2162,11 @@ document.addEventListener("DOMContentLoaded", function() {
   renderTemplateChips();
   renderHistory("inv_customers", "customerHistory");
   renderHistory("inv_projects", "projectHistory");
-  $("taxRate").addEventListener("change", updateSummary);
+  $("taxRate").addEventListener("change", function() {
+    // 既定を変えたら、明細フォームの初期値も追従させる（編集中の明細は触らない）
+    if (editingIndex < 0) setItemTax(docTaxRate());
+    renderItems();
+  });
 
   $("themeLight").addEventListener("click", function() { setTheme("light"); });
   $("themeDark").addEventListener("click", function() { setTheme("dark"); });
@@ -2047,7 +2209,19 @@ document.addEventListener("DOMContentLoaded", function() {
   $("modeDetailChk").addEventListener("change", function() { setDetailMode(this.checked); });
   $("itemUnit").addEventListener("input", renderUnitChips);
   renderUnitChips();
+  $("itemTax10").addEventListener("click", function() { setItemTax(10); });
+  $("itemTax8").addEventListener("click", function() { setItemTax(8); });
+  $("itemTax0").addEventListener("click", function() { setItemTax(0); });
+  setItemTax(docTaxRate());
   $("discount").addEventListener("input", updateSummary);
+  // 入力中は打ち消さず、離れた時点で実際に採用する額へ揃える
+  $("discount").addEventListener("blur", function() {
+    var c = calc();
+    if (c.discountRequested !== c.discount) {
+      this.value = c.discount ? String(c.discount) : "";
+      updateSummary();
+    }
+  });
 
   $("btnPreview").addEventListener("click", function() {
     var doc = buildDocFromForm();
