@@ -398,6 +398,46 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   padding: 2px 0 4px;
   line-height: 1.5;
 }
+
+/* 合計から値引きを逆算する（客先の予算に合わせるときに使う） */
+.target-block {
+  margin: 10px 0 6px;
+  padding: 12px;
+  background: var(--bg);
+  border-radius: 10px;
+}
+.target-block > label {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-sub);
+  margin-bottom: 8px;
+}
+.target-row { display: flex; gap: 8px; }
+.target-row input { flex: 1; height: 42px; text-align: right; }
+.target-row button {
+  flex-shrink: 0;
+  height: 42px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 10px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+.target-row button:active { transform: scale(0.97); }
+.target-note {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text-sub);
+  margin-top: 9px;
+  line-height: 1.6;
+}
+.target-note.ok { color: var(--primary); }
+body.dark .target-block { background: #262840; }
 .total-line.grand {
   border-top: 2px solid var(--text);
   margin-top: 8px;
@@ -823,6 +863,14 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
           <input type="number" id="discount" placeholder="0" inputmode="numeric" min="0" aria-label="値引き額" style="width:130px;height:38px;text-align:right">
         </div>
         <p class="discount-warn" id="discountWarn" style="display:none"></p>
+        <div class="target-block">
+          <label for="targetTotal">合計をこの金額にしたい（値引き額を計算します）</label>
+          <div class="target-row">
+            <input type="number" id="targetTotal" placeholder="例）980000" inputmode="numeric">
+            <button type="button" id="btnCalcDiscount">合わせる</button>
+          </div>
+          <p class="target-note" id="targetNote" style="display:none"></p>
+        </div>
         <div id="taxLines"></div>
         <div class="total-line grand"><span>合計</span><span id="sumTotal">¥0</span></div>
       </div>
@@ -1287,6 +1335,33 @@ function applyDiscount(groups, subtotal, discount) {
   return groups;
 }
 
+/* ある値引き額のときの税込合計。applyDiscount は破壊的なので毎回作り直す */
+function totalForDiscount(groups, subtotal, discount) {
+  var copy = [], i;
+  for (i = 0; i < groups.length; i++) {
+    copy.push({ rate: groups[i].rate, grossBase: groups[i].grossBase });
+  }
+  applyDiscount(copy, subtotal, discount);
+  var tax = 0;
+  for (i = 0; i < copy.length; i++) tax += copy[i].tax;
+  return subtotal - discount + tax;
+}
+
+/* 合計を指定の金額以下に収める最小の値引き額を求める。
+   値引きを1円増やすと合計は必ず1円以上減るので二分探索でよい。
+   消費税の切り捨てのせいで到達できない合計があるため、超えない側に寄せる。 */
+function discountForTotal(groups, subtotal, target) {
+  if (totalForDiscount(groups, subtotal, 0) <= target) return 0;
+  if (totalForDiscount(groups, subtotal, subtotal) > target) return subtotal;
+  var lo = 0, hi = subtotal;
+  while (lo < hi) {
+    var mid = Math.floor((lo + hi) / 2);
+    if (totalForDiscount(groups, subtotal, mid) > target) lo = mid + 1;
+    else hi = mid;
+  }
+  return lo;
+}
+
 /* 保存済み書類にも税率ごとの内訳を使わせる（古い書類は書類単位の税率から復元） */
 function docBreakdown(doc) {
   if (doc.taxBreakdown && doc.taxBreakdown.length) return doc.taxBreakdown;
@@ -1439,6 +1514,54 @@ function updateSummary() {
     line.innerHTML = "<span>" + esc(left) + "</span><span>" + yen(bd[i].tax) + "</span>";
     wrap.appendChild(line);
   }
+
+  // 逆算したあとに明細や値引きを触ったら、ずれていることを知らせる
+  var note = $("targetNote");
+  if (targetTotalApplied === null) {
+    note.style.display = "none";
+  } else if (c.total !== targetTotalApplied) {
+    note.textContent = "明細か値引きが変わりました。もう一度「合わせる」を押すと計算し直します";
+    note.className = "target-note";
+    note.style.display = "block";
+  }
+}
+
+/* ---------- 合計から値引きを逆算 ---------- */
+var targetTotalApplied = null; // 「合わせる」で実際に到達した合計
+
+function applyTargetTotal() {
+  var target = Math.round(Number($("targetTotal").value) || 0);
+  if (!items.length) { toast("先に明細を追加してください"); return; }
+  if (target <= 0) { toast("合計にしたい金額を入力してください"); return; }
+
+  var groups = taxBreakdown(items, docTaxRate());
+  var subtotal = 0;
+  for (var i = 0; i < groups.length; i++) subtotal += groups[i].grossBase;
+
+  var d = discountForTotal(groups, subtotal, target);
+  $("discount").value = d ? String(d) : "";
+
+  targetTotalApplied = null; // 先に消しておかないと updateSummary が食い違いを訴える
+  updateSummary();
+  var achieved = calc().total;
+  targetTotalApplied = achieved;
+
+  var note = $("targetNote");
+  if (achieved === target) {
+    note.textContent = "値引き " + yen(d) + " を入れて、合計 " + yen(achieved) + " になりました";
+    note.className = "target-note ok";
+  } else if (d === 0) {
+    note.textContent = "値引きなしでも合計は " + yen(achieved) + " です。これより高くはできません";
+    note.className = "target-note";
+  } else if (d >= subtotal) {
+    note.textContent = "全額を値引きしても合計は " + yen(achieved) + " までです";
+    note.className = "target-note";
+  } else {
+    note.textContent = "消費税の端数の関係でぴったりにはできないため、値引き " + yen(d) +
+      " で合計 " + yen(achieved) + " にしました";
+    note.className = "target-note";
+  }
+  note.style.display = "block";
 }
 
 var inputMode = "qty";
@@ -1758,6 +1881,8 @@ function clearForm() {
   $("customerName").value = "";
   $("projectName").value = "";
   $("discount").value = "";
+  $("targetTotal").value = "";
+  targetTotalApplied = null;
   $("taxRate").value = "10";
   $("docDate").value = todayStr();
   setItemTax(10);
@@ -1962,6 +2087,8 @@ function editDocument(idx, asNew) {
   $("projectName").value = d.project || "";
   $("taxRate").value = String(d.taxRate != null ? d.taxRate : 10);
   $("discount").value = d.discount || "";
+  $("targetTotal").value = "";
+  targetTotalApplied = null;
   items = JSON.parse(JSON.stringify(d.items || []));
 
   clearItemForm();
@@ -2422,6 +2549,10 @@ document.addEventListener("DOMContentLoaded", function() {
   $("itemTax0").addEventListener("click", function() { setItemTax(0); });
   setItemTax(docTaxRate());
   $("discount").addEventListener("input", updateSummary);
+  $("btnCalcDiscount").addEventListener("click", applyTargetTotal);
+  $("targetTotal").addEventListener("keydown", function(e) {
+    if (e.key === "Enter") { e.preventDefault(); applyTargetTotal(); }
+  });
   // 入力中は打ち消さず、離れた時点で実際に採用する額へ揃える
   $("discount").addEventListener("blur", function() {
     var c = calc();
