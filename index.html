@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#4f63d2">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
@@ -104,7 +104,8 @@ input, select {
   padding: 0 14px;
   border: 1.5px solid var(--border);
   border-radius: 10px;
-  font-size: 15px;
+  /* 16px未満だと iOS が入力時に勝手に拡大するため下げないこと */
+  font-size: 16px;
   font-family: inherit;
   background: #fafbfc;
   color: var(--text);
@@ -151,6 +152,22 @@ input:focus, select:focus {
 body.dark .tpl-chip { background: #262840; }
 body.dark .tpl-chip.action { background: transparent; }
 body.dark .tpl-chip.del { background: #3a2226; }
+
+/* 単位のかんたん入力（スマホで㎡などを打つのは手間なので） */
+.unit-chips { gap: 6px; }
+.unit-chips .tpl-chip {
+  height: 34px;
+  min-width: 46px;
+  padding: 0 12px;
+  justify-content: center;
+  font-size: 13px;
+}
+.unit-chips .tpl-chip.on {
+  border-color: var(--primary);
+  color: var(--primary);
+  background: #edf0ff;
+}
+body.dark .unit-chips .tpl-chip.on { background: #24284a; }
 
 /* 強調チェック */
 .chk-row {
@@ -232,6 +249,38 @@ body.dark .tpl-chip.del { background: #3a2226; }
 body.dark .warn-banner { background: #3a2f18; border-color: #7a5a20; }
 body.dark .warn-banner p { color: #f0c98a; }
 body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
+
+/* 保存できていないことを知らせる（見逃されると致命的なので目立たせる） */
+.danger-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--danger);
+  padding: 13px 16px;
+  position: sticky;
+  top: 0;
+  z-index: 60;
+}
+.danger-banner p {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.6;
+}
+.danger-banner button {
+  flex-shrink: 0;
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
 
 /* 入力方法切替 */
 .seg { display: flex; gap: 8px; }
@@ -560,7 +609,11 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   left: 50%;
   bottom: 90px;
   transform: translateX(-50%);
-  background: rgba(25, 28, 50, 0.92);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: calc(100vw - 32px);
+  background: rgba(25, 28, 50, 0.94);
   color: #fff;
   font-size: 13px;
   font-weight: 600;
@@ -573,6 +626,21 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   white-space: nowrap;
 }
 .toast.show { opacity: 1; }
+/* 取り消しなどの操作を伴うトーストだけ触れるようにする */
+.toast.actionable { pointer-events: auto; }
+#toastAction {
+  flex-shrink: 0;
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 15px;
+  background: #fff;
+  color: #1a1a2e;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
 </style>
 </head>
 <body>
@@ -581,6 +649,11 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   <div class="header">
     <h1 id="headerTitle">新規作成</h1>
     <p id="headerSub">見積書・請求書をかんたん作成</p>
+  </div>
+
+  <div class="danger-banner" id="storageBanner" style="display:none">
+    <p><strong>保存できていません。</strong>この端末の保存領域が一杯です。設定画面からバックアップを書き出し、一覧から古い書類を削除してください。</p>
+    <button type="button" id="btnStorageHelp">対処する</button>
   </div>
 
   <!-- ========== 作成画面 ========== -->
@@ -598,28 +671,28 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
     <div class="card">
       <div class="card-title">基本情報</div>
       <div class="field">
-        <label>書類の種類</label>
+        <label for="docType">書類の種類</label>
         <select id="docType">
           <option value="見積書">見積書</option>
           <option value="請求書">請求書</option>
         </select>
       </div>
       <div class="field">
-        <label>日付</label>
+        <label for="docDate">日付</label>
         <input type="date" id="docDate">
       </div>
       <div class="field">
-        <label>宛先（顧客名）</label>
+        <label for="customerName">宛先（顧客名）</label>
         <input type="text" id="customerName" placeholder="○○○○株式会社" list="customerHistory" autocomplete="off">
         <datalist id="customerHistory"></datalist>
       </div>
       <div class="field">
-        <label>件名</label>
+        <label for="projectName">件名</label>
         <input type="text" id="projectName" placeholder="外壁塗装修繕工事" list="projectHistory" autocomplete="off">
         <datalist id="projectHistory"></datalist>
       </div>
       <div class="field">
-        <label>消費税率</label>
+        <label for="taxRate">消費税率</label>
         <select id="taxRate">
           <option value="10">10%（標準税率）</option>
           <option value="8">8%（軽減税率）</option>
@@ -632,10 +705,10 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
       <div class="card-title">明細を追加</div>
       <div class="field" id="templateField">
         <label>よく使う項目（タップで入力できます）</label>
-        <div class="tpl-chips" id="tplChips"></div>
+        <div class="tpl-chips" id="tplChips" role="group" aria-label="よく使う項目"></div>
       </div>
       <div class="field">
-        <label>内容</label>
+        <label for="itemName">内容</label>
         <input type="text" id="itemName" placeholder="下地調整">
       </div>
       <label class="chk-row" id="detailRow">
@@ -644,7 +717,7 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
       </label>
       <div class="field" id="amountModeField">
         <label>金額の入力方法</label>
-        <div class="seg">
+        <div class="seg" role="group" aria-label="金額の入力方法">
           <button type="button" class="seg-btn on" id="modeQty">数量×単価</button>
           <button type="button" class="seg-btn" id="modeLump">一式</button>
         </div>
@@ -653,21 +726,24 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
       <div id="qtyFields">
         <div class="row" id="qtyRow">
           <div class="field" style="flex:1.3">
-            <label>数量</label>
+            <label for="itemQty">数量</label>
             <input type="number" id="itemQty" placeholder="100" inputmode="decimal">
           </div>
           <div class="field" style="flex:0.9">
-            <label>単位</label>
-            <input type="text" id="itemUnit" placeholder="㎡">
+            <label for="itemUnit">単位</label>
+            <input type="text" id="itemUnit" placeholder="任意">
           </div>
         </div>
         <div class="field">
-          <label>単価</label>
+          <div class="tpl-chips unit-chips" id="unitChips" role="group" aria-label="単位のかんたん入力"></div>
+        </div>
+        <div class="field">
+          <label for="itemPrice">単価</label>
           <input type="number" id="itemPrice" placeholder="500" inputmode="numeric">
         </div>
       </div>
       <div class="field" id="lumpRow" style="display:none">
-        <label>金額（一式）</label>
+        <label for="itemAmount">金額（一式）</label>
         <input type="number" id="itemAmount" placeholder="50000" inputmode="numeric">
       </div>
       <label class="chk-row">
@@ -688,7 +764,7 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
         <div class="total-line"><span id="taxLabel">消費税（10%）</span><span id="sumTax">¥0</span></div>
         <div class="total-line" style="gap:12px">
           <span>値引き</span>
-          <input type="number" id="discount" placeholder="0" inputmode="numeric" style="width:130px;height:38px;text-align:right">
+          <input type="number" id="discount" placeholder="0" inputmode="numeric" aria-label="値引き額" style="width:130px;height:38px;text-align:right">
         </div>
         <div class="total-line grand"><span>合計</span><span id="sumTotal">¥0</span></div>
       </div>
@@ -702,10 +778,10 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   <div class="screen" id="screen-list">
     <div class="card" style="padding:14px 16px">
       <div class="field" style="margin-bottom:10px">
-        <input type="text" id="docSearch" placeholder="顧客名・件名で検索">
+        <input type="search" id="docSearch" placeholder="顧客名・件名で検索" aria-label="顧客名・件名で検索">
       </div>
       <div class="field" style="margin-bottom:0">
-        <select id="docSort">
+        <select id="docSort" aria-label="並び順">
           <option value="new">新しい順</option>
           <option value="old">古い順</option>
           <option value="high">金額が高い順</option>
@@ -722,14 +798,14 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
       <div class="card-title">表示設定</div>
       <div class="field">
         <label>画面の配色</label>
-        <div class="seg">
+        <div class="seg" role="group" aria-label="画面の配色">
           <button type="button" class="seg-btn on" id="themeLight">ライト</button>
           <button type="button" class="seg-btn" id="themeDark">ダーク</button>
         </div>
       </div>
       <div class="field" style="margin-bottom:0">
         <label>文字の大きさ（現場で見やすく調整できます）</label>
-        <div class="seg">
+        <div class="seg" role="group" aria-label="文字の大きさ">
           <button type="button" class="seg-btn" id="fsS">小</button>
           <button type="button" class="seg-btn on" id="fsM">標準</button>
           <button type="button" class="seg-btn" id="fsL">大</button>
@@ -738,12 +814,12 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
     </div>
     <div class="card">
       <div class="card-title">自社情報（帳票に印字されます）</div>
-      <div class="field"><label>会社名・屋号</label><input type="text" id="setName" placeholder="○○塗装工業"></div>
-      <div class="field"><label>郵便番号</label><input type="text" id="setZip" placeholder="000-0000"></div>
-      <div class="field"><label>住所</label><input type="text" id="setAddress"></div>
-      <div class="field"><label>電話番号</label><input type="text" id="setPhone" inputmode="tel"></div>
-      <div class="field"><label>代表者名</label><input type="text" id="setRep"></div>
-      <div class="field"><label>振込先（請求書に印字されます）</label><input type="text" id="setBank" placeholder="○○銀行 ○○支店 普通 0000000"></div>
+      <div class="field"><label for="setName">会社名・屋号</label><input type="text" id="setName" placeholder="○○塗装工業"></div>
+      <div class="field"><label for="setZip">郵便番号</label><input type="text" id="setZip" placeholder="000-0000"></div>
+      <div class="field"><label for="setAddress">住所</label><input type="text" id="setAddress"></div>
+      <div class="field"><label for="setPhone">電話番号</label><input type="text" id="setPhone" inputmode="tel"></div>
+      <div class="field"><label for="setRep">代表者名</label><input type="text" id="setRep"></div>
+      <div class="field"><label for="setBank">振込先（請求書に印字されます）</label><input type="text" id="setBank" placeholder="○○銀行 ○○支店 普通 0000000"></div>
       <p class="save-note" id="settingsSaveNote">入力した内容は自動で保存されます</p>
     </div>
 
@@ -802,7 +878,10 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
 <!-- 印刷専用領域 -->
 <div id="printArea"><div class="paper" id="printPaper"></div></div>
 
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast">
+  <span id="toastText"></span>
+  <button type="button" id="toastAction" style="display:none"></button>
+</div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
@@ -829,11 +908,40 @@ function esc(s) {
     .replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
-function toast(msg) {
+var toastTimer = null;
+
+/* actionLabel / actionFn を渡すと「元に戻す」などのボタン付きになる */
+function toast(msg, actionLabel, actionFn) {
   var t = $("toast");
-  t.textContent = msg;
+  var btn = $("toastAction");
+  clearTimeout(toastTimer);
+  $("toastText").textContent = msg;
+
+  if (actionLabel) {
+    btn.textContent = actionLabel;
+    btn.style.display = "block";
+    btn.onclick = function() {
+      hideToast();
+      actionFn();
+    };
+    t.classList.add("actionable");
+  } else {
+    btn.style.display = "none";
+    btn.onclick = null;
+    t.classList.remove("actionable");
+  }
+
   t.classList.add("show");
-  setTimeout(function(){ t.classList.remove("show"); }, 1800);
+  // 取り消せる時間は少し長めに取る
+  toastTimer = setTimeout(hideToast, actionLabel ? 6000 : 1800);
+}
+
+function hideToast() {
+  clearTimeout(toastTimer);
+  var t = $("toast");
+  t.classList.remove("show");
+  t.classList.remove("actionable");
+  $("toastAction").onclick = null;
 }
 function todayStr() {
   var d = new Date();
@@ -858,26 +966,48 @@ function loadAll() {
     if (t) templates = JSON.parse(t);
   } catch (e) {}
 }
-function persistDocs() {
+
+/* 保存の失敗は必ず表に出す（黙って消えるのが一番まずい） */
+var storageFailed = false;
+
+function reportStorageError(what) {
+  storageFailed = true;
+  $("storageBanner").style.display = "flex";
+  toast(what + "を保存できませんでした");
+}
+
+function clearStorageError() {
+  if (!storageFailed) return;
+  storageFailed = false;
+  $("storageBanner").style.display = "none";
+}
+
+function writeStore(key, value, what) {
   try {
-    localStorage.setItem("inv_documents", JSON.stringify(documents));
+    localStorage.setItem(key, value);
     localStorage.setItem("inv_updatedAt", String(Date.now()));
-  } catch (e) {}
+  } catch (e) {
+    reportStorageError(what);
+    return false;
+  }
+  clearStorageError();
+  return true;
+}
+
+function persistDocs() {
+  var ok = writeStore("inv_documents", JSON.stringify(documents), "書類");
   scheduleCloudPush();
+  return ok;
 }
 function persistSettings() {
-  try {
-    localStorage.setItem("inv_settings", JSON.stringify(settings));
-    localStorage.setItem("inv_updatedAt", String(Date.now()));
-  } catch (e) {}
+  var ok = writeStore("inv_settings", JSON.stringify(settings), "自社情報");
   scheduleCloudPush();
+  return ok;
 }
 function persistTemplates() {
-  try {
-    localStorage.setItem("inv_templates", JSON.stringify(templates));
-    localStorage.setItem("inv_updatedAt", String(Date.now()));
-  } catch (e) {}
+  var ok = writeStore("inv_templates", JSON.stringify(templates), "よく使う項目");
   scheduleCloudPush();
+  return ok;
 }
 
 /* ---------- 表示設定（テーマ・文字サイズ） ---------- */
@@ -1089,10 +1219,20 @@ function renderItems() {
       bDel.className = "btn-mini danger";
       bDel.textContent = "削除";
       bDel.onclick = function() {
+        // 誤タップで消えても取り戻せるようにしておく（確認を挟むより手数が少ない）
+        var removed = items[idx];
+        var prevEditing = editingIndex;
         if (editingIndex === idx) cancelEdit();
         else if (editingIndex > idx) editingIndex--;
         items.splice(idx, 1);
         renderItems();
+        toast("「" + removed.name + "」を削除しました", "元に戻す", function() {
+          items.splice(idx, 0, removed);
+          // 編集中の明細を消した場合はフォームを閉じてあるので編集状態には戻さない
+          editingIndex = (prevEditing === idx) ? -1 : prevEditing;
+          renderItems();
+          toast("戻しました");
+        });
       };
 
       acts.appendChild(bUp);
@@ -1154,7 +1294,7 @@ function addItem() {
     obj = { name: name, lump: true, amount: Math.round(amount) };
   } else {
     var qty = Number($("itemQty").value);
-    var unit = $("itemUnit").value.trim() || "㎡";
+    var unit = $("itemUnit").value.trim(); // 空欄なら単位なし（勝手に補うと誤った書類になる）
     var price = Number($("itemPrice").value);
     if (!qty || qty <= 0) { toast("数量を入力してください"); return; }
     if (!price || price <= 0) { toast("単価を入力してください"); return; }
@@ -1182,6 +1322,7 @@ function clearItemForm() {
   $("itemPrice").value = "";
   $("itemAmount").value = "";
   $("itemBig").checked = false;
+  renderUnitChips();
 }
 
 function startEdit(idx) {
@@ -1195,8 +1336,9 @@ function startEdit(idx) {
   if (it.lump) $("itemAmount").value = it.amount;
   if (!it.lump && !it.detail) {
     $("itemQty").value = it.qty;
-    $("itemUnit").value = it.unit;
+    $("itemUnit").value = it.unit || "";
     $("itemPrice").value = it.price;
+    renderUnitChips();
   }
   $("btnAddItem").textContent = "✓ この内容で更新";
   $("fabAddItem").textContent = "✓";
@@ -1229,6 +1371,29 @@ function moveItem(idx, dir) {
 
 /* ---------- テンプレート（名前のみ登録・チップ式） ---------- */
 var tplEditMode = false;
+
+/* ---------- 単位チップ ---------- */
+var unitPresets = ["式", "個", "㎡", "m", "台", "箇所", "本", "回"];
+
+function renderUnitChips() {
+  var wrap = $("unitChips");
+  var current = $("itemUnit").value.trim();
+  wrap.innerHTML = "";
+  for (var i = 0; i < unitPresets.length; i++) {
+    (function(u) {
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "tpl-chip" + (u === current ? " on" : "");
+      chip.textContent = u;
+      chip.onclick = function() {
+        // 同じものをもう一度押したら解除（単位なしにできる）
+        $("itemUnit").value = ($("itemUnit").value.trim() === u) ? "" : u;
+        renderUnitChips();
+      };
+      wrap.appendChild(chip);
+    })(unitPresets[i]);
+  }
+}
 
 function renderTemplateChips() {
   var wrap = $("tplChips");
@@ -1389,7 +1554,7 @@ function paperHTML(doc) {
       rows +=
         "<tr>" +
           "<td" + (bigName ? ' style="' + bigName + '"' : "") + ">" + esc(it.name) + "</td>" +
-          '<td class="num">' + esc(it.qty) + " " + esc(it.unit) + "</td>" +
+          '<td class="num">' + esc(it.qty) + (it.unit ? " " + esc(it.unit) : "") + "</td>" +
           '<td class="num">' + yen(it.price) + "</td>" +
           '<td class="num"' + (bigAmt ? ' style="' + bigAmt + '"' : "") + '>' + yen(it.amount) + "</td>" +
         "</tr>";
@@ -1459,17 +1624,28 @@ function printCurrent() {
 }
 
 /* ---------- 保存・一覧 ---------- */
+/* 保存に成功したときだけ true を返す。false のときは呼び出し側で
+   入力内容をクリアしてはいけない（消えた上に画面まで移ると復旧不能になる） */
 function saveDoc(doc) {
-  if (editingDocIndex >= 0 && documents[editingDocIndex]) {
-    documents[editingDocIndex] = doc;
-    toast(doc.type + "を更新しました");
-  } else {
-    documents.unshift(doc);
-    toast(doc.type + "を保存しました");
+  var updating = editingDocIndex >= 0 && documents[editingDocIndex];
+  var backup = documents.slice();
+  var restoreIndex = editingDocIndex;
+
+  if (updating) documents[editingDocIndex] = doc;
+  else documents.unshift(doc);
+
+  if (!persistDocs()) {
+    // 書き込めなかったので、メモリ上の一覧も元に戻して食い違いを防ぐ
+    documents = backup;
+    editingDocIndex = restoreIndex;
+    alert("保存できませんでした。\n\nこの端末の保存領域が一杯です。入力内容はそのまま残してあります。\n設定画面でバックアップを書き出すか、一覧から不要な書類を削除してから、もう一度保存してください。");
+    return false;
   }
+
   editingDocIndex = -1;
   updateEditBanner();
-  persistDocs();
+  toast(doc.type + (updating ? "を更新しました" : "を保存しました"));
+  return true;
 }
 
 function updateEditBanner() {
@@ -1592,8 +1768,11 @@ function renderDocList() {
       bDel.textContent = "削除";
       bDel.onclick = function() {
         if (confirm("この書類を削除しますか？")) {
-          documents.splice(realIdx, 1);
-          persistDocs();
+          var removed = documents.splice(realIdx, 1);
+          if (!persistDocs()) {
+            documents.splice(realIdx, 0, removed[0]); // 書き込めていないので戻す
+            alert("削除を保存できませんでした。書類はそのまま残しています。");
+          }
           renderDocList();
         }
       };
@@ -1611,7 +1790,11 @@ function convertToInvoice(idx) {
   copy.type = "請求書";
   copy.date = todayStr();
   documents.unshift(copy);
-  persistDocs();
+  if (!persistDocs()) {
+    documents.shift();
+    alert("保存できませんでした。\n\nこの端末の保存領域が一杯です。\n設定画面でバックアップを書き出すか、不要な書類を削除してからお試しください。");
+    return;
+  }
   renderDocList();
   toast("請求書として複製しました");
 }
@@ -1862,6 +2045,8 @@ document.addEventListener("DOMContentLoaded", function() {
   $("modeQty").addEventListener("click", function() { setMode("qty"); });
   $("modeLump").addEventListener("click", function() { setMode("lump"); });
   $("modeDetailChk").addEventListener("change", function() { setDetailMode(this.checked); });
+  $("itemUnit").addEventListener("input", renderUnitChips);
+  renderUnitChips();
   $("discount").addEventListener("input", updateSummary);
 
   $("btnPreview").addEventListener("click", function() {
@@ -1871,16 +2056,14 @@ document.addEventListener("DOMContentLoaded", function() {
 
   $("btnSave").addEventListener("click", function() {
     var doc = buildDocFromForm();
-    if (doc) {
-      saveDoc(doc);
+    if (doc && saveDoc(doc)) {
       clearForm();
       showScreen("list");
     }
   });
 
   $("btnSaveFromPreview").addEventListener("click", function() {
-    if (previewingDoc) {
-      saveDoc(previewingDoc);
+    if (previewingDoc && saveDoc(previewingDoc)) {
       closePreview();
       clearForm();
       showScreen("list");
@@ -1901,6 +2084,10 @@ document.addEventListener("DOMContentLoaded", function() {
   $("btnGoSettings").addEventListener("click", function() {
     showScreen("settings", true);
     $("setName").focus();
+  });
+  $("btnStorageHelp").addEventListener("click", function() {
+    showScreen("settings", true);
+    $("btnExport").scrollIntoView({ behavior: "smooth", block: "center" });
   });
   updateCompanyWarning();
 
