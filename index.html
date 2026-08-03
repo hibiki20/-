@@ -305,7 +305,7 @@ body.dark .tpl-chip.del { background: #3a2226; }
 .doc-project { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
 .doc-total { font-weight: 800; font-size: 16px; }
 .doc-date { font-size: 11px; color: var(--text-sub); text-align: right; margin-top: 2px; }
-.doc-btns { display: flex; gap: 8px; margin-top: 12px; }
+.doc-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
 .empty {
   text-align: center;
@@ -519,6 +519,12 @@ body.dark .tpl-chip.del { background: #3a2226; }
 
   <!-- ========== 作成画面 ========== -->
   <div class="screen active" id="screen-create">
+    <div class="card" id="editBanner" style="display:none;background:var(--primary);color:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px">
+        <span id="editBannerText" style="font-size:13px;font-weight:600"></span>
+        <button type="button" class="btn-mini" id="btnExitEdit" style="background:rgba(255,255,255,.25);color:#fff;border-color:transparent;flex-shrink:0">編集を中止</button>
+      </div>
+    </div>
     <div class="card">
       <div class="card-title">基本情報</div>
       <div class="field">
@@ -736,6 +742,7 @@ var settings = {
 };
 var previewingDoc = null;
 var editingIndex = -1;
+var editingDocIndex = -1; // 一覧から呼び出した既存書類を編集中の場合、documents内のindex
 
 /* ---------- ユーティリティ ---------- */
 function $(id) { return document.getElementById(id); }
@@ -928,8 +935,13 @@ function showScreen(name) {
   for (var j = 0; j < tabs.length; j++) {
     tabs[j].classList.toggle("on", tabs[j].getAttribute("data-screen") === name);
   }
-  $("headerTitle").textContent = titles[name][0];
-  $("headerSub").textContent = titles[name][1];
+  if (name === "create" && editingDocIndex >= 0) {
+    $("headerTitle").textContent = "書類の編集";
+    $("headerSub").textContent = "内容を修正して保存できます";
+  } else {
+    $("headerTitle").textContent = titles[name][0];
+    $("headerSub").textContent = titles[name][1];
+  }
 
   if (name === "list") renderDocList();
   if (name === "settings") fillSettingsForm();
@@ -1198,8 +1210,9 @@ function buildDocFromForm() {
   var c = calc();
   addHistory("inv_customers", customer);
   addHistory("inv_projects", project);
+  var existingId = (editingDocIndex >= 0 && documents[editingDocIndex]) ? documents[editingDocIndex].id : null;
   return {
-    id: Date.now(),
+    id: existingId || Date.now(),
     type: $("docType").value,
     date: $("docDate").value || todayStr(),
     customer: customer,
@@ -1216,6 +1229,8 @@ function buildDocFromForm() {
 function clearForm() {
   items = [];
   editingIndex = -1;
+  editingDocIndex = -1;
+  updateEditBanner();
   clearItemForm();
   $("btnAddItem").textContent = "＋ 明細に追加";
   $("btnCancelEdit").style.display = "none";
@@ -1343,9 +1358,60 @@ function printCurrent() {
 
 /* ---------- 保存・一覧 ---------- */
 function saveDoc(doc) {
-  documents.unshift(doc);
+  if (editingDocIndex >= 0 && documents[editingDocIndex]) {
+    documents[editingDocIndex] = doc;
+    toast(doc.type + "を更新しました");
+  } else {
+    documents.unshift(doc);
+    toast(doc.type + "を保存しました");
+  }
+  editingDocIndex = -1;
+  updateEditBanner();
   persistDocs();
-  toast(doc.type + "を保存しました");
+}
+
+function updateEditBanner() {
+  if (editingDocIndex >= 0 && documents[editingDocIndex]) {
+    var d = documents[editingDocIndex];
+    $("editBanner").style.display = "block";
+    $("editBannerText").textContent = esc(d.customer) + "様「" + esc(d.project) + "」を編集中";
+    $("btnSave").textContent = "更新を保存";
+  } else {
+    $("editBanner").style.display = "none";
+    $("btnSave").textContent = "下書き保存";
+  }
+}
+
+function editDocument(idx) {
+  var d = documents[idx];
+  if (!d) return;
+  editingDocIndex = idx;
+  editingIndex = -1;
+
+  $("docType").value = d.type;
+  $("docDate").value = d.date || todayStr();
+  $("customerName").value = d.customer || "";
+  $("projectName").value = d.project || "";
+  $("taxRate").value = String(d.taxRate != null ? d.taxRate : 10);
+  $("discount").value = d.discount || "";
+  items = JSON.parse(JSON.stringify(d.items || []));
+
+  clearItemForm();
+  $("btnAddItem").textContent = "＋ 明細に追加";
+  $("btnCancelEdit").style.display = "none";
+  setMode("qty");
+
+  renderItems();
+  updateEditBanner();
+  showScreen("create");
+}
+
+function exitEditDoc() {
+  if (!confirm("編集を中止しますか？変更は保存されません。")) return;
+  editingDocIndex = -1;
+  clearForm();
+  updateEditBanner();
+  showScreen("list");
 }
 
 function renderDocList() {
@@ -1402,6 +1468,12 @@ function renderDocList() {
       bView.textContent = "表示・PDF";
       bView.onclick = function() { openPreview(d, false); };
       btns.appendChild(bView);
+
+      var bEdit = document.createElement("button");
+      bEdit.className = "btn btn-sm btn-outline";
+      bEdit.textContent = "編集";
+      bEdit.onclick = function() { editDocument(realIdx); };
+      btns.appendChild(bEdit);
 
       if (d.type === "見積書") {
         var bConv = document.createElement("button");
@@ -1652,6 +1724,7 @@ document.addEventListener("DOMContentLoaded", function() {
 
   $("btnAddItem").addEventListener("click", addItem);
   $("btnCancelEdit").addEventListener("click", cancelEdit);
+  $("btnExitEdit").addEventListener("click", exitEditDoc);
   $("modeQty").addEventListener("click", function() { setMode("qty"); });
   $("modeLump").addEventListener("click", function() { setMode("lump"); });
   $("modeDetail").addEventListener("click", function() { setMode("detail"); });
