@@ -430,6 +430,37 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
 .doc-project { font-size: 12px; color: var(--text-sub); margin-top: 2px; }
 .doc-total { font-weight: 800; font-size: 16px; }
 .doc-date { font-size: 11px; color: var(--text-sub); text-align: right; margin-top: 2px; }
+.doc-no {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-sub);
+  margin-left: 7px;
+}
+
+/* しぼり込んだ結果の集計（確定申告のときに月別・年別の売上を見るため） */
+.summary-bar {
+  background: var(--card);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  margin-bottom: 12px;
+  border-left: 4px solid var(--primary);
+  box-shadow: 0 1px 3px rgba(20, 24, 60, 0.05);
+}
+.summary-bar .s-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.summary-bar .s-main span { font-size: 13px; font-weight: 600; color: var(--text-sub); }
+.summary-bar .s-main strong { font-size: 20px; font-weight: 800; }
+.summary-bar .s-sub {
+  font-size: 11px;
+  color: var(--text-sub);
+  margin-top: 5px;
+  line-height: 1.6;
+}
 .doc-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 
 .empty {
@@ -518,7 +549,7 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   margin-bottom: 10px;
   color: #000;
 }
-.paper .p-date { text-align: right; font-size: 11px; color: #000; }
+.paper .p-date { text-align: right; font-size: 11px; color: #000; line-height: 1.7; }
 .paper .p-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin: 12px 0 6px; }
 .paper .p-to {
   font-size: 15px;
@@ -688,9 +719,15 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
           <option value="請求書">請求書</option>
         </select>
       </div>
-      <div class="field">
-        <label for="docDate">日付</label>
-        <input type="date" id="docDate">
+      <div class="row">
+        <div class="field" style="flex:1.1">
+          <label for="docDate">日付</label>
+          <input type="date" id="docDate">
+        </div>
+        <div class="field" style="flex:0.9">
+          <label for="docNo">番号</label>
+          <input type="text" id="docNo" placeholder="2026-001" autocomplete="off">
+        </div>
       </div>
       <div class="field">
         <label for="customerName">宛先（顧客名）</label>
@@ -799,7 +836,19 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   <div class="screen" id="screen-list">
     <div class="card" style="padding:14px 16px">
       <div class="field" style="margin-bottom:10px">
-        <input type="search" id="docSearch" placeholder="顧客名・件名で検索" aria-label="顧客名・件名で検索">
+        <input type="search" id="docSearch" placeholder="顧客名・件名・番号で検索" aria-label="顧客名・件名・番号で検索">
+      </div>
+      <div class="row" style="margin-bottom:10px">
+        <div class="field" style="margin-bottom:0">
+          <select id="docTypeFilter" aria-label="書類の種類でしぼり込む">
+            <option value="all">すべての種類</option>
+            <option value="見積書">見積書のみ</option>
+            <option value="請求書">請求書のみ</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0">
+          <select id="docPeriod" aria-label="期間でしぼり込む"></select>
+        </div>
       </div>
       <div class="field" style="margin-bottom:0">
         <select id="docSort" aria-label="並び順">
@@ -809,6 +858,10 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
           <option value="low">金額が低い順</option>
         </select>
       </div>
+    </div>
+    <div class="summary-bar" id="docSummary" style="display:none">
+      <div class="s-main"><span id="sumCount">0件</span><strong id="sumAmount">¥0</strong></div>
+      <div class="s-sub" id="sumDetail"></div>
     </div>
     <div id="docList"></div>
   </div>
@@ -1175,7 +1228,7 @@ function showScreen(name, skipConfirm) {
     $("headerSub").textContent = name === "settings" ? settingsSubtitle() : titles[name][1];
   }
 
-  if (name === "list") renderDocList();
+  if (name === "list") { renderPeriodOptions(); renderDocList(); }
   if (name === "settings") fillSettingsForm();
   if (name === "create") updateCompanyWarning();
   document.querySelector(".app").scrollTop = 0;
@@ -1578,6 +1631,44 @@ function saveCurrentAsTemplate() {
   toast("「" + name + "」を登録しました");
 }
 
+/* ---------- 書類番号 ----------
+   種類ごと・年ごとの連番（例 2026-001）。手で書き換えたら自動採番はやめる */
+var docNoTouched = false;
+
+function nextDocNo(type, dateIso) {
+  var year = (dateIso || todayStr()).slice(0, 4);
+  var max = 0;
+  for (var i = 0; i < documents.length; i++) {
+    var d = documents[i];
+    if (d.type !== type || !d.docNo) continue;
+    var m = String(d.docNo).match(/^(\d{4})-(\d+)$/);
+    if (!m || m[1] !== year) continue;
+    if (Number(m[2]) > max) max = Number(m[2]);
+  }
+  return year + "-" + ("00" + (max + 1)).slice(-3);
+}
+
+/* 未入力・未編集のときだけ採番し直す（編集中の書類の番号は動かさない） */
+function refreshDocNo() {
+  if (docNoTouched || editingDocIndex >= 0) return;
+  $("docNo").value = nextDocNo($("docType").value, $("docDate").value);
+}
+
+function setDocNo(value) {
+  $("docNo").value = value;
+  docNoTouched = false;
+}
+
+/* 同じ種類で番号が重複していないか（自分自身は除く） */
+function docNoTaken(type, no, selfId) {
+  if (!no) return false;
+  for (var i = 0; i < documents.length; i++) {
+    var d = documents[i];
+    if (d.id !== selfId && d.type === type && d.docNo === no) return true;
+  }
+  return false;
+}
+
 /* ---------- 書類の組み立て ---------- */
 function buildDocFromForm() {
   var customer = $("customerName").value.trim();
@@ -1592,13 +1683,23 @@ function buildDocFromForm() {
       return null;
     }
   }
+  var type = $("docType").value;
+  var existingId = (editingDocIndex >= 0 && documents[editingDocIndex]) ? documents[editingDocIndex].id : null;
+  var docNo = $("docNo").value.trim();
+  if (docNoTaken(type, docNo, existingId)) {
+    if (!confirm("番号「" + docNo + "」は同じ種類の別の書類で使われています。\nこのまま進めますか？")) {
+      $("docNo").focus();
+      return null;
+    }
+  }
+
   var c = calc();
   addHistory("inv_customers", customer);
   addHistory("inv_projects", project);
-  var existingId = (editingDocIndex >= 0 && documents[editingDocIndex]) ? documents[editingDocIndex].id : null;
   return {
     id: existingId || Date.now(),
-    type: $("docType").value,
+    type: type,
+    docNo: docNo,
     date: $("docDate").value || todayStr(),
     customer: customer,
     project: project,
@@ -1627,6 +1728,8 @@ function clearForm() {
   $("taxRate").value = "10";
   $("docDate").value = todayStr();
   setItemTax(10);
+  docNoTouched = false;
+  refreshDocNo();
   renderHistory("inv_customers", "customerHistory");
   renderHistory("inv_projects", "projectHistory");
   renderItems();
@@ -1730,7 +1833,8 @@ function paperHTML(doc) {
   }
 
   return (
-    '<div class="p-date">' + (dateLabels[doc.type] || "発行日") + "　" + slashDate(doc.date) + "</div>" +
+    '<div class="p-date">' + (dateLabels[doc.type] || "発行日") + "　" + slashDate(doc.date) +
+      (doc.docNo ? '<br>No.　' + esc(doc.docNo) : "") + "</div>" +
     "<h2>" + esc(titleMap[doc.type] || doc.type) + "</h2>" +
     '<div class="p-head">' +
       '<div class="p-to">' + esc(doc.customer) + "　様</div>" +
@@ -1819,6 +1923,8 @@ function editDocument(idx, asNew) {
 
   $("docType").value = d.type;
   $("docDate").value = asNew ? todayStr() : (d.date || todayStr());
+  // 複製は別の書類なので新しい番号を振る。編集は元の番号を保つ
+  setDocNo(asNew ? nextDocNo(d.type, todayStr()) : (d.docNo || nextDocNo(d.type, d.date)));
   $("customerName").value = d.customer || "";
   $("projectName").value = d.project || "";
   $("taxRate").value = String(d.taxRate != null ? d.taxRate : 10);
@@ -1846,14 +1952,75 @@ function exitEditDoc() {
   showScreen("list");
 }
 
+/* 期間の選択肢は保存済みの書類から組み立てる（書類のある年だけ出す） */
+function renderPeriodOptions() {
+  var sel = $("docPeriod");
+  var keep = sel.value;
+  var years = [];
+  for (var i = 0; i < documents.length; i++) {
+    var y = String(documents[i].date || "").slice(0, 4);
+    if (y && years.indexOf(y) === -1) years.push(y);
+  }
+  years.sort().reverse();
+
+  var html = '<option value="all">全期間</option>' +
+             '<option value="thismonth">今月</option>' +
+             '<option value="thisyear">今年</option>';
+  for (var j = 0; j < years.length; j++) {
+    html += '<option value="y' + years[j] + '">' + years[j] + "年</option>";
+  }
+  sel.innerHTML = html;
+  // 選択中の期間が残っていればそのまま維持する
+  sel.value = keep;
+  if (!sel.value) sel.value = "all";
+}
+
+function inPeriod(doc, period) {
+  if (period === "all") return true;
+  var date = String(doc.date || "");
+  var now = new Date();
+  var thisYear = String(now.getFullYear());
+  var thisMonth = thisYear + "-" + ("0" + (now.getMonth() + 1)).slice(-2);
+  if (period === "thismonth") return date.slice(0, 7) === thisMonth;
+  if (period === "thisyear") return date.slice(0, 4) === thisYear;
+  if (period.charAt(0) === "y") return date.slice(0, 4) === period.slice(1);
+  return true;
+}
+
+function renderSummary(list) {
+  var bar = $("docSummary");
+  if (!list.length) { bar.style.display = "none"; return; }
+
+  var total = 0, tax = 0, quotes = 0, invoices = 0;
+  for (var i = 0; i < list.length; i++) {
+    total += list[i].total;
+    tax += list[i].tax || 0;
+    if (list[i].type === "請求書") invoices++; else quotes++;
+  }
+
+  $("sumCount").textContent = list.length + "件の合計";
+  $("sumAmount").textContent = yen(total);
+
+  var parts = [];
+  if (quotes) parts.push("見積書 " + quotes + "件");
+  if (invoices) parts.push("請求書 " + invoices + "件");
+  parts.push("うち消費税 " + yen(tax));
+  $("sumDetail").textContent = parts.join("　/　");
+  bar.style.display = "block";
+}
+
 function renderDocList() {
   var wrap = $("docList");
   var keyword = ($("docSearch").value || "").trim().toLowerCase();
   var sortKey = $("docSort").value;
+  var typeFilter = $("docTypeFilter").value;
+  var period = $("docPeriod").value || "all";
 
   var list = documents.filter(function(d) {
+    if (typeFilter !== "all" && d.type !== typeFilter) return false;
+    if (!inPeriod(d, period)) return false;
     if (!keyword) return true;
-    return (d.customer + " " + d.project).toLowerCase().indexOf(keyword) !== -1;
+    return (d.customer + " " + d.project + " " + (d.docNo || "")).toLowerCase().indexOf(keyword) !== -1;
   });
 
   list = list.slice().sort(function(a, b) {
@@ -1863,6 +2030,8 @@ function renderDocList() {
     return b.id - a.id; // new（デフォルト）
   });
 
+  renderSummary(list);
+
   if (!documents.length) {
     wrap.innerHTML =
       '<div class="empty"><div class="icon">📂</div>' +
@@ -1870,7 +2039,7 @@ function renderDocList() {
     return;
   }
   if (!list.length) {
-    wrap.innerHTML = '<div class="empty"><div class="icon">🔍</div>該当する書類が見つかりません</div>';
+    wrap.innerHTML = '<div class="empty"><div class="icon">🔍</div>条件に合う書類が見つかりません</div>';
     return;
   }
 
@@ -1884,6 +2053,7 @@ function renderDocList() {
         '<div class="doc-top">' +
           "<div>" +
             '<span class="doc-type">' + esc(d.type) + "</span>" +
+            (d.docNo ? '<span class="doc-no">No.' + esc(d.docNo) + "</span>" : "") +
             '<div class="doc-customer">' + esc(d.customer) + " 様</div>" +
             '<div class="doc-project">' + esc(d.project) + "</div>" +
           "</div>" +
@@ -1947,6 +2117,7 @@ function convertToInvoice(idx) {
   copy.id = Date.now();
   copy.type = "請求書";
   copy.date = todayStr();
+  copy.docNo = nextDocNo("請求書", copy.date); // 請求書としての番号を振り直す
   documents.unshift(copy);
   if (!persistDocs()) {
     documents.shift();
@@ -2159,6 +2330,10 @@ document.addEventListener("DOMContentLoaded", function() {
   loadAll();
   loadDisplaySettings();
   $("docDate").value = todayStr();
+  refreshDocNo();
+  $("docType").addEventListener("change", refreshDocNo);
+  $("docDate").addEventListener("change", refreshDocNo);
+  $("docNo").addEventListener("input", function() { docNoTouched = true; });
   renderTemplateChips();
   renderHistory("inv_customers", "customerHistory");
   renderHistory("inv_projects", "projectHistory");
@@ -2267,6 +2442,9 @@ document.addEventListener("DOMContentLoaded", function() {
 
   $("docSearch").addEventListener("input", renderDocList);
   $("docSort").addEventListener("change", renderDocList);
+  $("docTypeFilter").addEventListener("change", renderDocList);
+  $("docPeriod").addEventListener("change", renderDocList);
+  renderPeriodOptions();
 
   // 下部の保存ボタンが見えている間はフローティングボタンと重ならないよう隠す
   if ("IntersectionObserver" in window) {
