@@ -596,26 +596,19 @@ body.dark .target-block { background: #262840; }
 }
 .paper .p-date { text-align: right; font-size: 11px; color: #000; line-height: 1.7; }
 .paper .p-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin: 12px 0 6px; }
-/* 宛名は書類の顔なので、件名や差出人より一段大きく出す */
+/* 宛名は書類の顔なので、タイトルに次ぐ大きさで出す */
 .paper .p-to {
-  font-size: 19px;
+  font-size: 24px;
   font-weight: 700;
-  border-bottom: 1px solid #000;
-  padding: 0 30px 4px 2px;
+  border-bottom: 1.5px solid #000;
+  padding: 0 34px 5px 2px;
   align-self: flex-start;
-  margin-top: 4px;
-  line-height: 1.5;
+  margin-top: 2px;
+  line-height: 1.45;
   color: #000;
 }
 .paper .p-from { font-size: 10.5px; line-height: 1.65; text-align: left; color: #000; }
-/* 差出人の社名は「誰が出した書類か」を示す要なので、住所などより一段大きく */
-.paper .p-from strong {
-  display: block;
-  font-size: 16px;
-  line-height: 1.4;
-  margin-bottom: 5px;
-  letter-spacing: 0.02em;
-}
+.paper .p-from strong { font-size: 12.5px; }
 .paper .p-msg { font-size: 11.5px; margin: 4px 0 12px; color: #000; }
 .paper .p-project {
   font-size: 16px;
@@ -714,8 +707,7 @@ body.dark .target-block { background: #262840; }
   #printArea .paper.compact table { font-size: 10px; }
   #printArea .paper.compact th, #printArea .paper.compact td { padding: 4px 6px; }
   #printArea .paper.compact h2 { font-size: 19px; margin-bottom: 6px; }
-  #printArea .paper.compact .p-to { font-size: 16px; padding-bottom: 3px; }
-  #printArea .paper.compact .p-from strong { font-size: 14px; margin-bottom: 3px; }
+  #printArea .paper.compact .p-to { font-size: 20px; padding-bottom: 3px; }
   #printArea .paper.compact .p-project { font-size: 14px; margin-bottom: 10px; }
   #printArea .paper.compact .p-grand { margin: 2px 0 10px; padding: 6px 14px 7px; }
   #printArea .paper.compact .p-grand .amt { font-size: 20px; }
@@ -2121,7 +2113,7 @@ function paperHTML(doc) {
   }
 
   var from = "";
-  if (settings.name) from += "<strong>" + esc(settings.name) + "</strong>"; // strong は block なので改行は不要
+  if (settings.name) from += "<strong>" + esc(settings.name) + "</strong><br>";
   if (settings.zip) from += "〒" + esc(settings.zip) + "<br>";
   if (settings.address) from += esc(settings.address) + "<br>";
   if (settings.rep) from += "代表：" + esc(settings.rep) + "<br>";
