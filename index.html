@@ -642,6 +642,9 @@ body.dark .target-block { background: #262840; }
   padding-bottom: 3px;
   margin-bottom: 6px;
 }
+/* 振込先は項目ごとに改行して縦に並べる */
+.paper .r-bank { line-height: 1.9; }
+.paper .r-bank .b-title { font-weight: 700; }
 
 /* 印刷: 帳票だけを出力 */
 @page { size: A4 portrait; margin: 12mm; }
@@ -941,7 +944,27 @@ body.dark .target-block { background: #262840; }
       <div class="field"><label for="setAddress">住所</label><input type="text" id="setAddress"></div>
       <div class="field"><label for="setPhone">電話番号</label><input type="text" id="setPhone" inputmode="tel"></div>
       <div class="field"><label for="setRep">代表者名</label><input type="text" id="setRep"></div>
-      <div class="field"><label for="setBank">振込先（請求書に印字されます）</label><input type="text" id="setBank" placeholder="○○銀行 ○○支店 普通 0000000"></div>
+      <div class="field" style="margin-bottom:8px">
+        <label>振込先（請求書に印字されます）</label>
+      </div>
+      <div class="field"><label for="setBankName">銀行名</label><input type="text" id="setBankName" placeholder="○○銀行"></div>
+      <div class="field"><label for="setBankBranch">支店名</label><input type="text" id="setBankBranch" placeholder="○○支店"></div>
+      <div class="row">
+        <div class="field" style="flex:0.85">
+          <label for="setBankType">口座種別</label>
+          <select id="setBankType">
+            <option value="">（未選択）</option>
+            <option value="普通">普通</option>
+            <option value="当座">当座</option>
+            <option value="貯蓄">貯蓄</option>
+          </select>
+        </div>
+        <div class="field" style="flex:1.15">
+          <label for="setBankNumber">口座番号</label>
+          <input type="text" id="setBankNumber" placeholder="0000000" inputmode="numeric">
+        </div>
+      </div>
+      <div class="field"><label for="setBankHolder">口座名義</label><input type="text" id="setBankHolder" placeholder="ヤマダ タロウ"></div>
       <p class="save-note" id="settingsSaveNote">入力した内容は自動で保存されます</p>
     </div>
 
@@ -1016,7 +1039,8 @@ var items = [];
 var documents = [];
 var templates = [];
 var settings = {
-  name: "", zip: "", address: "", phone: "", rep: "", bank: ""
+  name: "", zip: "", address: "", phone: "", rep: "",
+  bankName: "", bankBranch: "", bankType: "", bankNumber: "", bankHolder: ""
 };
 var previewingDoc = null;
 var editingIndex = -1;
@@ -1087,6 +1111,36 @@ function loadAll() {
     var t = localStorage.getItem("inv_templates");
     if (t) templates = JSON.parse(t);
   } catch (e) {}
+  migrateBankSettings();
+}
+
+/* 以前は振込先を1行の文字列で持っていた。項目ごとに分けて印字できるよう、
+   保存済みの文字列を銀行名・支店名・種別・番号・名義に振り分ける。
+   取りこぼした部分は銀行名に残すので、設定画面で直せば済むようにしてある。 */
+function migrateBankSettings() {
+  if (!settings.bank) return;
+  if (settings.bankName || settings.bankBranch || settings.bankNumber || settings.bankHolder) {
+    delete settings.bank;
+    return;
+  }
+
+  var rest = [];
+  var parts = String(settings.bank).split(/[\s　]+/);
+  for (var i = 0; i < parts.length; i++) {
+    var p = parts[i];
+    if (!p) continue;
+    if (!settings.bankName && /(銀行|信用金庫|信金|信用組合|labor|労働金庫|農協|漁協|JA)$/i.test(p)) settings.bankName = p;
+    else if (!settings.bankBranch && /(支店|支所|出張所|本店|本所)$/.test(p)) settings.bankBranch = p;
+    else if (!settings.bankType && /^(普通|当座|貯蓄)(預金)?$/.test(p)) settings.bankType = p.replace("預金", "");
+    else if (!settings.bankNumber && /^[0-9][0-9-]{2,}$/.test(p)) settings.bankNumber = p;
+    else rest.push(p);
+  }
+  var leftover = rest.join(" ");
+  if (!settings.bankName) { settings.bankName = leftover; leftover = ""; }
+  if (leftover) settings.bankHolder = leftover;
+
+  delete settings.bank;
+  persistSettings();
 }
 
 /* 保存の失敗は必ず表に出す（黙って消えるのが一番まずい） */
@@ -1199,6 +1253,7 @@ function importBackup(file) {
       documents = data.documents || [];
       settings = data.settings || settings;
       templates = data.templates || [];
+      migrateBankSettings(); // 古いバージョンで書き出した1行の振込先をその場で分解する
       if (data.display) displaySettings = data.display;
       if (data.customers) localStorage.setItem("inv_customers", JSON.stringify(data.customers));
       if (data.projects) localStorage.setItem("inv_projects", JSON.stringify(data.projects));
@@ -1912,6 +1967,23 @@ function slashDate(iso) {
   return p[0] + "/" + Number(p[1]) + "/" + Number(p[2]);
 }
 
+/* 振込先は項目ごとに行を分けて印字する（1行に詰めると横に長くなって読みにくい） */
+function bankHTML() {
+  var lines = [];
+
+  var where = [settings.bankName, settings.bankBranch].filter(Boolean).join("　");
+  if (where) lines.push(esc(where));
+
+  var account = [settings.bankType, settings.bankNumber].filter(Boolean).join("　");
+  if (account) lines.push(esc(account));
+
+  if (settings.bankHolder) lines.push("名義　" + esc(settings.bankHolder));
+
+  if (!lines.length) return "";
+  return '<div class="r-bank"><div class="b-title">＜振込先＞</div>' +
+    lines.join("<br>") + "</div>";
+}
+
 function paperHTML(doc) {
   var bd = docBreakdown(doc);
   var mixed = bd.length > 1;
@@ -1984,7 +2056,7 @@ function paperHTML(doc) {
 
   var remarksHTML = "";
   if (doc.type === "請求書") {
-    var bank = settings.bank ? "＜振込先＞<br>" + esc(settings.bank) : "";
+    var bank = bankHTML();
     remarksHTML =
       '<div style="clear:both"></div>' +
       '<div class="p-remarks"><div class="r-title">備　考</div>' + bank + "</div>";
@@ -2295,7 +2367,11 @@ function fillSettingsForm() {
   $("setAddress").value = settings.address || "";
   $("setPhone").value = settings.phone || "";
   $("setRep").value = settings.rep || "";
-  $("setBank").value = settings.bank || "";
+  $("setBankName").value = settings.bankName || "";
+  $("setBankBranch").value = settings.bankBranch || "";
+  $("setBankType").value = settings.bankType || "";
+  $("setBankNumber").value = settings.bankNumber || "";
+  $("setBankHolder").value = settings.bankHolder || "";
   clearTimeout(settingsSaveTimer);
   $("settingsSaveNote").textContent = "入力した内容は自動で保存されます";
   $("settingsSaveNote").classList.remove("saved");
@@ -2311,7 +2387,11 @@ function saveSettings() {
     address: $("setAddress").value.trim(),
     phone: $("setPhone").value.trim(),
     rep: $("setRep").value.trim(),
-    bank: $("setBank").value.trim()
+    bankName: $("setBankName").value.trim(),
+    bankBranch: $("setBankBranch").value.trim(),
+    bankType: $("setBankType").value,
+    bankNumber: $("setBankNumber").value.trim(),
+    bankHolder: $("setBankHolder").value.trim()
   };
   persistSettings();
   updateCompanyWarning();
@@ -2439,6 +2519,7 @@ function mergeState(cloud) {
   var localUpdated = Number(localStorage.getItem("inv_updatedAt") || 0);
   if ((cloud.updatedAt || 0) > localUpdated && cloud.settings && cloud.settings.name) {
     settings = cloud.settings;
+    migrateBankSettings(); // 旧バージョンの端末から降ってきた1行の振込先を分解する
   }
 
   // 入力履歴：結合
@@ -2590,10 +2671,12 @@ document.addEventListener("DOMContentLoaded", function() {
     if (e.target === this) closePreview();
   });
 
-  var setFields = ["setName", "setZip", "setAddress", "setPhone", "setRep", "setBank"];
+  var setFields = ["setName", "setZip", "setAddress", "setPhone", "setRep",
+                   "setBankName", "setBankBranch", "setBankNumber", "setBankHolder"];
   for (var s = 0; s < setFields.length; s++) {
     $(setFields[s]).addEventListener("input", scheduleSettingsSave);
   }
+  $("setBankType").addEventListener("change", scheduleSettingsSave);
   $("btnGoSettings").addEventListener("click", function() {
     showScreen("settings", true);
     $("setName").focus();
