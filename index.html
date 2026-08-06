@@ -399,6 +399,11 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   line-height: 1.5;
 }
 
+/* 値引きを税抜・税込どちらから引くかの切り替え */
+.disc-mode { margin: 8px 0 4px; }
+.disc-mode .seg-btn { height: 38px; font-size: 12px; }
+.disc-mode p { font-size: 11px; color: var(--text-sub); margin-top: 6px; line-height: 1.5; }
+
 /* 合計から値引きを逆算する（客先の予算に合わせるときに使う） */
 .target-block {
   margin: 10px 0 6px;
@@ -612,13 +617,25 @@ body.dark .target-block { background: #262840; }
   margin-bottom: 14px;
   color: #000;
 }
-.paper .p-grand { font-size: 12px; font-weight: 700; margin: 2px 0 14px; color: #000; }
-.paper .p-grand .amt {
-  font-size: 16px;
-  border-bottom: 3px double #000;
-  padding: 0 14px 2px 6px;
-  margin: 0 6px 0 10px;
+/* 合計金額はこの書類で一番見られる数字なので、枠で囲って大きく出す */
+.paper .p-grand {
+  display: inline-block;
+  font-size: 13px;
+  font-weight: 700;
+  border: 2px solid #000;
+  padding: 8px 18px 9px;
+  margin: 6px 0 16px;
+  color: #000;
+  line-height: 1.2;
 }
+.paper .p-grand .amt {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  padding: 0 2px;
+  margin: 0 8px 0 14px;
+}
+.paper .p-grand .zei { font-size: 11px; font-weight: 700; }
 .paper table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
 .paper th, .paper td { border: 1px solid #000; padding: 7px 8px; color: #000; }
 .paper th { background: #e4e4e4; font-weight: 700; text-align: center; }
@@ -688,7 +705,8 @@ body.dark .target-block { background: #262840; }
   #printArea .paper.compact th, #printArea .paper.compact td { padding: 4px 6px; }
   #printArea .paper.compact h2 { font-size: 19px; margin-bottom: 6px; }
   #printArea .paper.compact .p-project { font-size: 14px; margin-bottom: 10px; }
-  #printArea .paper.compact .p-grand { margin-bottom: 10px; }
+  #printArea .paper.compact .p-grand { margin: 2px 0 10px; padding: 6px 14px 7px; }
+  #printArea .paper.compact .p-grand .amt { font-size: 20px; }
   #printArea .paper.compact .p-msg { margin: 3px 0 8px; }
 }
 #printArea { display: none; }
@@ -865,12 +883,22 @@ body.dark .target-block { background: #262840; }
       <div id="itemsList"></div>
       <div style="margin-top:10px">
         <div class="total-line"><span>小計（税抜）</span><span id="sumSubtotal">¥0</span></div>
-        <div class="total-line" style="gap:12px">
-          <span>値引き</span>
-          <input type="number" id="discount" placeholder="0" inputmode="numeric" min="0" aria-label="値引き額" style="width:130px;height:38px;text-align:right">
+        <div id="discountBlock">
+          <div class="total-line" style="gap:12px">
+            <span>値引き</span>
+            <input type="number" id="discount" placeholder="0" inputmode="numeric" min="0" aria-label="値引き額" style="width:130px;height:38px;text-align:right">
+          </div>
+          <p class="discount-warn" id="discountWarn" style="display:none"></p>
+          <div class="disc-mode">
+            <div class="seg" role="group" aria-label="値引きの引き方">
+              <button type="button" class="seg-btn on" id="discPreTax">税抜から引く</button>
+              <button type="button" class="seg-btn" id="discPostTax">税込から引く</button>
+            </div>
+            <p id="discModeHint">値引き後の金額に消費税がかかります（一般的な方法）</p>
+          </div>
         </div>
-        <p class="discount-warn" id="discountWarn" style="display:none"></p>
-        <div class="target-block">
+        <div id="taxLines"></div>
+        <div class="target-block" id="targetBlock">
           <label for="targetTotal">合計をこの金額にしたい（値引き額を計算します）</label>
           <div class="target-row">
             <input type="number" id="targetTotal" placeholder="例）980000" inputmode="numeric">
@@ -878,7 +906,6 @@ body.dark .target-block { background: #262840; }
           </div>
           <p class="target-note" id="targetNote" style="display:none"></p>
         </div>
-        <div id="taxLines"></div>
         <div class="total-line grand"><span>合計</span><span id="sumTotal">¥0</span></div>
       </div>
     </div>
@@ -1394,28 +1421,50 @@ function applyDiscount(groups, subtotal, discount) {
   return groups;
 }
 
-/* ある値引き額のときの税込合計。applyDiscount は破壊的なので毎回作り直す */
-function totalForDiscount(groups, subtotal, discount) {
-  var copy = [], i;
+/* 値引きの引き方。
+   pretax  … 税抜の小計から引き、値引き後の額に消費税を掛ける（一般的）
+   posttax … 消費税は値引き前の額に掛け、税込の合計から値引き額を引く */
+var discountMode = "pretax";
+
+/* 与えられた値引き額での集計。applyDiscount は破壊的なので毎回作り直す */
+function computeTotals(groups, subtotal, requested, mode) {
+  var copy = [], i, tax = 0, maxDiscount, discount;
   for (i = 0; i < groups.length; i++) {
     copy.push({ rate: groups[i].rate, grossBase: groups[i].grossBase });
   }
+
+  if (mode === "posttax") {
+    applyDiscount(copy, subtotal, 0); // 値引きは税額に影響しない
+    for (i = 0; i < copy.length; i++) tax += copy[i].tax;
+    maxDiscount = subtotal + tax;
+    discount = Math.min(Math.max(requested, 0), maxDiscount);
+    return { breakdown: copy, tax: tax, discount: discount, maxDiscount: maxDiscount,
+             total: subtotal + tax - discount };
+  }
+
+  maxDiscount = subtotal;
+  discount = Math.min(Math.max(requested, 0), maxDiscount);
   applyDiscount(copy, subtotal, discount);
-  var tax = 0;
   for (i = 0; i < copy.length; i++) tax += copy[i].tax;
-  return subtotal - discount + tax;
+  return { breakdown: copy, tax: tax, discount: discount, maxDiscount: maxDiscount,
+           total: subtotal - discount + tax };
+}
+
+function totalForDiscount(groups, subtotal, discount, mode) {
+  return computeTotals(groups, subtotal, discount, mode).total;
 }
 
 /* 合計を指定の金額以下に収める最小の値引き額を求める。
    値引きを1円増やすと合計は必ず1円以上減るので二分探索でよい。
    消費税の切り捨てのせいで到達できない合計があるため、超えない側に寄せる。 */
-function discountForTotal(groups, subtotal, target) {
-  if (totalForDiscount(groups, subtotal, 0) <= target) return 0;
-  if (totalForDiscount(groups, subtotal, subtotal) > target) return subtotal;
-  var lo = 0, hi = subtotal;
+function discountForTotal(groups, subtotal, target, mode) {
+  var max = computeTotals(groups, subtotal, Infinity, mode).maxDiscount;
+  if (totalForDiscount(groups, subtotal, 0, mode) <= target) return 0;
+  if (totalForDiscount(groups, subtotal, max, mode) > target) return max;
+  var lo = 0, hi = max;
   while (lo < hi) {
     var mid = Math.floor((lo + hi) / 2);
-    if (totalForDiscount(groups, subtotal, mid) > target) lo = mid + 1;
+    if (totalForDiscount(groups, subtotal, mid, mode) > target) lo = mid + 1;
     else hi = mid;
   }
   return lo;
@@ -1427,30 +1476,32 @@ function docBreakdown(doc) {
   return [{ rate: doc.taxRate != null ? doc.taxRate : 10, base: doc.subtotal, tax: doc.tax }];
 }
 
+/* 値引きの引き方を持たない書類の扱い。税率の内訳もない＝一番古い書類は、
+   当時の計算（税は値引き前の額に対して算出）どおり税込から引いた扱いにする */
+function docDiscountMode(doc) {
+  if (doc.discountMode) return doc.discountMode;
+  return doc.taxBreakdown ? "pretax" : "posttax";
+}
+
 function calc() {
   var docRate = Number($("taxRate").value);
   var groups = taxBreakdown(items, docRate);
   var subtotal = 0, i;
   for (i = 0; i < groups.length; i++) subtotal += groups[i].grossBase;
 
-  // 値引きは税抜の小計が上限（これを超えるとマイナスの書類になってしまう）
   var requested = Math.round(Number($("discount").value) || 0);
-  var maxDiscount = subtotal;
-  var discount = Math.min(Math.max(requested, 0), maxDiscount);
-
-  var breakdown = applyDiscount(groups, subtotal, discount);
-  var tax = 0;
-  for (i = 0; i < breakdown.length; i++) tax += breakdown[i].tax;
+  var t = computeTotals(groups, subtotal, requested, discountMode);
 
   return {
     subtotal: subtotal,
-    tax: tax,
+    tax: t.tax,
     taxRate: docRate,
-    breakdown: breakdown,
-    discount: discount,
+    breakdown: t.breakdown,
+    discount: t.discount,
     discountRequested: requested,
-    maxDiscount: maxDiscount,
-    total: subtotal - discount + tax
+    maxDiscount: t.maxDiscount,
+    discountMode: discountMode,
+    total: t.total
   };
 }
 
@@ -1546,10 +1597,19 @@ function updateSummary() {
   $("sumSubtotal").textContent = yen(c.subtotal);
   $("sumTotal").textContent = yen(c.total);
 
-  // 値引きが税抜の小計を超えるとマイナスの書類になってしまうので、その場で知らせる
+  // 引き方に応じて、値引き行を消費税行の前か後ろに置く
+  var block = $("discountBlock"), taxWrap = $("taxLines");
+  if (c.discountMode === "posttax") {
+    if (block.previousElementSibling !== taxWrap) block.parentNode.insertBefore(taxWrap, block);
+  } else {
+    if (taxWrap.previousElementSibling !== block) block.parentNode.insertBefore(block, taxWrap);
+  }
+
+  // 値引きが上限を超えるとマイナスの書類になってしまうので、その場で知らせる
   var warn = $("discountWarn");
+  var limitName = c.discountMode === "posttax" ? "税込合計の " : "小計の ";
   if (c.discountRequested > c.maxDiscount) {
-    warn.textContent = "値引きは小計の " + yen(c.maxDiscount) + " までです（" + yen(c.maxDiscount) + " として計算しています）";
+    warn.textContent = "値引きは" + limitName + yen(c.maxDiscount) + " までです（" + yen(c.maxDiscount) + " として計算しています）";
     warn.style.display = "block";
   } else if (c.discountRequested < 0) {
     warn.textContent = "値引きにマイナスは入力できません";
@@ -1569,7 +1629,10 @@ function updateSummary() {
     var left = bd.length > 1
       ? rateLabel(bd[i].rate) + "対象 " + yen(bd[i].base) + " の消費税"
       : "消費税（" + rateLabel(bd[i].rate) + "）";
-    if (bd.length === 1 && c.discount > 0) left = "消費税（" + rateLabel(bd[i].rate) + "・対象 " + yen(bd[i].base) + "）";
+    // 税抜から引いたときだけ、課税対象が値引き後になっていることを示す
+    if (bd.length === 1 && c.discount > 0 && c.discountMode === "pretax") {
+      left = "消費税（" + rateLabel(bd[i].rate) + "・対象 " + yen(bd[i].base) + "）";
+    }
     line.innerHTML = "<span>" + esc(left) + "</span><span>" + yen(bd[i].tax) + "</span>";
     wrap.appendChild(line);
   }
@@ -1585,6 +1648,19 @@ function updateSummary() {
   }
 }
 
+var discountModeHints = {
+  pretax: "値引き後の金額に消費税がかかります（一般的な方法）",
+  posttax: "消費税は値引き前の金額にかかり、税込の合計から値引きします"
+};
+
+function setDiscountMode(mode) {
+  discountMode = mode;
+  $("discPreTax").classList.toggle("on", mode === "pretax");
+  $("discPostTax").classList.toggle("on", mode === "posttax");
+  $("discModeHint").textContent = discountModeHints[mode];
+  updateSummary();
+}
+
 /* ---------- 合計から値引きを逆算 ---------- */
 var targetTotalApplied = null; // 「合わせる」で実際に到達した合計
 
@@ -1597,7 +1673,7 @@ function applyTargetTotal() {
   var subtotal = 0;
   for (var i = 0; i < groups.length; i++) subtotal += groups[i].grossBase;
 
-  var d = discountForTotal(groups, subtotal, target);
+  var d = discountForTotal(groups, subtotal, target, discountMode);
   $("discount").value = d ? String(d) : "";
 
   targetTotalApplied = null; // 先に消しておかないと updateSummary が食い違いを訴える
@@ -1612,7 +1688,7 @@ function applyTargetTotal() {
   } else if (d === 0) {
     note.textContent = "値引きなしでも合計は " + yen(achieved) + " です。これより高くはできません";
     note.className = "target-note";
-  } else if (d >= subtotal) {
+  } else if (d >= calc().maxDiscount) {
     note.textContent = "全額を値引きしても合計は " + yen(achieved) + " までです";
     note.className = "target-note";
   } else {
@@ -1924,6 +2000,7 @@ function buildDocFromForm() {
     taxRate: c.taxRate,
     taxBreakdown: JSON.parse(JSON.stringify(c.breakdown)),
     discount: c.discount,
+    discountMode: c.discountMode,
     total: c.total
   };
 }
@@ -1942,6 +2019,7 @@ function clearForm() {
   $("discount").value = "";
   $("targetTotal").value = "";
   targetTotalApplied = null;
+  setDiscountMode("pretax");
   $("taxRate").value = "10";
   $("docDate").value = todayStr();
   setItemTax(10);
@@ -2075,15 +2153,15 @@ function paperHTML(doc) {
       '<div class="p-from">' + from + "</div>" +
     "</div>" +
     '<div class="p-msg">' + (greetings[doc.type] || "") + "</div>" +
-    '<div class="p-grand">合計金額<span class="amt">' + yen(doc.total) + "</span>（税込）</div>" +
+    '<div class="p-grand">合計金額<span class="amt">' + yen(doc.total) + '</span><span class="zei">（税込）</span></div>' +
     '<div class="p-project">工事件名：　' + esc(doc.project) + "</div>" +
     "<table><thead><tr><th>内　容</th><th>数量</th><th>単価</th><th>金額</th></tr></thead>" +
     "<tbody>" + rows + "</tbody></table>" +
     reducedNote +
     '<div class="p-sum">' +
       "<div><span>小計</span><span>" + yen(doc.subtotal) + "</span></div>" +
-      discountLine +
-      taxLines +
+      // 税込から引いた書類は 小計→消費税→値引き の順で出す
+      (docDiscountMode(doc) === "posttax" ? taxLines + discountLine : discountLine + taxLines) +
       '<div class="g"><span>合計</span><span>' + yen(doc.total) + "</span></div>" +
     "</div>" +
     remarksHTML
@@ -2165,6 +2243,7 @@ function editDocument(idx, asNew) {
   $("discount").value = d.discount || "";
   $("targetTotal").value = "";
   targetTotalApplied = null;
+  setDiscountMode(docDiscountMode(d));
   items = JSON.parse(JSON.stringify(d.items || []));
 
   clearItemForm();
@@ -2634,6 +2713,8 @@ document.addEventListener("DOMContentLoaded", function() {
   $("itemTax0").addEventListener("click", function() { setItemTax(0); });
   setItemTax(docTaxRate());
   $("discount").addEventListener("input", updateSummary);
+  $("discPreTax").addEventListener("click", function() { setDiscountMode("pretax"); });
+  $("discPostTax").addEventListener("click", function() { setDiscountMode("posttax"); });
   $("btnCalcDiscount").addEventListener("click", applyTargetTotal);
   $("targetTotal").addEventListener("keydown", function(e) {
     if (e.key === "Enter") { e.preventDefault(); applyTargetTotal(); }
