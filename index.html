@@ -659,12 +659,16 @@ body.dark .target-block { background: #262840; }
   #printArea { display: block !important; width: 100%; }
   #printArea .paper {
     border-radius: 0;
-    padding: 0;
+    /* 表や備考枠の罫線が印刷領域の境界ちょうどに乗ると、印刷時の丸めや
+       プリンタの余白で右端が欠ける。内側に少し余白を取って逃がしておく */
+    padding: 0 3mm;
     font-size: 12px;
     width: 100%;
     max-width: 100%;
     box-sizing: border-box;
   }
+  /* 長い件名・宛名でも右にはみ出さないようにする（右パディング付きの inline-block のため） */
+  #printArea .p-project, #printArea .p-to { max-width: 100%; box-sizing: border-box; }
   #printArea table { width: 100%; table-layout: fixed; }
   #printArea th:first-child, #printArea td:first-child { width: 46%; }
   #printArea th:not(:first-child), #printArea td:not(:first-child) { width: 18%; }
