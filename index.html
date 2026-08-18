@@ -399,6 +399,19 @@ body.dark .warn-banner button { background: #f0c98a; color: #2a2008; }
   line-height: 1.5;
 }
 
+/* プレビューでの用紙の詰め方と、何ページになるかの表示 */
+.page-ctrl { margin-bottom: 12px; }
+.page-ctrl .seg-btn { height: 40px; font-size: 12px; }
+.page-ctrl p {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sub);
+  margin-top: 8px;
+  text-align: center;
+  line-height: 1.5;
+}
+.page-ctrl p.multi { color: var(--danger); }
+
 /* 値引きを税抜・税込どちらから引くかの切り替え */
 .disc-mode { margin: 8px 0 4px; }
 .disc-mode .seg-btn { height: 38px; font-size: 12px; }
@@ -666,6 +679,59 @@ body.dark .target-block { background: #262840; }
 .paper .r-bank { line-height: 1.9; }
 .paper .r-bank .b-title { font-weight: 700; }
 
+/* A4に組んだときのレイアウト。印刷前に高さを測れるよう、@media print の外に置く */
+.paper.a4 {
+  border-radius: 0;
+  /* 表や備考枠の罫線が印刷領域の境界ちょうどに乗ると、印刷時の丸めや
+     プリンタの余白で右端が欠ける。内側に少し余白を取って逃がしておく */
+  padding: 0 3mm;
+  font-size: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+/* 長い件名・宛名でも右にはみ出さないようにする（右パディング付きの inline-block のため） */
+.paper.a4 .p-project, .paper.a4 .p-to { max-width: 100%; box-sizing: border-box; }
+.paper.a4 table { width: 100%; table-layout: fixed; }
+.paper.a4 th:first-child, .paper.a4 td:first-child { width: 46%; }
+.paper.a4 th:not(:first-child), .paper.a4 td:not(:first-child) { width: 18%; }
+.paper.a4 .p-sum { width: 100%; max-width: 55%; }
+
+/* 1ページに収めるための詰め具合。compact → tight の順に密になる */
+.paper.a4.compact { font-size: 10.5px; line-height: 1.5; }
+.paper.a4.compact table { font-size: 10px; }
+.paper.a4.compact th, .paper.a4.compact td { padding: 4px 6px; }
+.paper.a4.compact h2 { font-size: 19px; margin-bottom: 6px; }
+.paper.a4.compact .p-to { font-size: 20px; padding-bottom: 3px; }
+.paper.a4.compact .p-project { font-size: 14px; margin-bottom: 10px; }
+.paper.a4.compact .p-grand { margin: 2px 0 10px; padding: 6px 14px 7px; }
+.paper.a4.compact .p-grand .amt { font-size: 20px; }
+.paper.a4.compact .p-msg { margin: 3px 0 8px; }
+
+.paper.a4.tight { font-size: 9.5px; line-height: 1.4; }
+.paper.a4.tight table { font-size: 9px; }
+.paper.a4.tight th, .paper.a4.tight td { padding: 2px 5px; }
+.paper.a4.tight h2 { font-size: 17px; margin-bottom: 4px; letter-spacing: 0.3em; }
+.paper.a4.tight .p-to { font-size: 17px; padding-bottom: 2px; }
+.paper.a4.tight .p-head { margin: 6px 0 4px; }
+.paper.a4.tight .p-project { font-size: 13px; margin-bottom: 7px; }
+.paper.a4.tight .p-grand { margin: 2px 0 7px; padding: 4px 12px 5px; }
+.paper.a4.tight .p-grand .amt { font-size: 17px; }
+.paper.a4.tight .p-msg { margin: 2px 0 5px; }
+.paper.a4.tight .p-sum { margin-top: 7px; }
+.paper.a4.tight .p-remarks { margin-top: 10px; min-height: 46px; padding: 6px 8px 8px; }
+.paper.a4.tight .r-bank { line-height: 1.6; }
+
+/* 印刷前に高さを測るための場所。画面には出さないが配置はされる */
+#measureArea {
+  position: absolute;
+  left: -20000px;
+  top: 0;
+  width: 186mm; /* A4(210mm) から左右の余白12mmずつを引いた幅 */
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* 印刷: 帳票だけを出力 */
 @page { size: A4 portrait; margin: 12mm; }
 @media print {
@@ -675,24 +741,8 @@ body.dark .target-block { background: #262840; }
     color-adjust: exact !important;
   }
   body { background: #fff; padding: 0; display: block; height: auto; overflow: visible; }
-  .app, .tabbar, .modal, .toast { display: none !important; }
+  .app, .tabbar, .modal, .toast, #measureArea { display: none !important; }
   #printArea { display: block !important; width: 100%; }
-  #printArea .paper {
-    border-radius: 0;
-    /* 表や備考枠の罫線が印刷領域の境界ちょうどに乗ると、印刷時の丸めや
-       プリンタの余白で右端が欠ける。内側に少し余白を取って逃がしておく */
-    padding: 0 3mm;
-    font-size: 12px;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-  }
-  /* 長い件名・宛名でも右にはみ出さないようにする（右パディング付きの inline-block のため） */
-  #printArea .p-project, #printArea .p-to { max-width: 100%; box-sizing: border-box; }
-  #printArea table { width: 100%; table-layout: fixed; }
-  #printArea th:first-child, #printArea td:first-child { width: 46%; }
-  #printArea th:not(:first-child), #printArea td:not(:first-child) { width: 18%; }
-  #printArea .p-sum { width: 100%; max-width: 55%; }
 
   /* 改ページ制御 */
   #printArea table { page-break-inside: auto; }
@@ -701,17 +751,6 @@ body.dark .target-block { background: #262840; }
   #printArea .p-head, #printArea .p-grand, #printArea .p-project { page-break-inside: avoid; }
   #printArea .p-sum { page-break-inside: avoid; }      /* 小計〜合計は分断しない */
   #printArea .p-remarks { page-break-inside: avoid; }  /* 備考も分断しない */
-
-  /* 明細が多いときの縮小モード（1〜2枚に収める） */
-  #printArea .paper.compact { font-size: 10.5px; line-height: 1.5; }
-  #printArea .paper.compact table { font-size: 10px; }
-  #printArea .paper.compact th, #printArea .paper.compact td { padding: 4px 6px; }
-  #printArea .paper.compact h2 { font-size: 19px; margin-bottom: 6px; }
-  #printArea .paper.compact .p-to { font-size: 20px; padding-bottom: 3px; }
-  #printArea .paper.compact .p-project { font-size: 14px; margin-bottom: 10px; }
-  #printArea .paper.compact .p-grand { margin: 2px 0 10px; padding: 6px 14px 7px; }
-  #printArea .paper.compact .p-grand .amt { font-size: 20px; }
-  #printArea .paper.compact .p-msg { margin: 3px 0 8px; }
 }
 #printArea { display: none; }
 
@@ -1049,6 +1088,13 @@ body.dark .target-block { background: #262840; }
       <div class="paper" id="previewPaper"></div>
     </div>
     <div class="sheet-foot">
+      <div class="page-ctrl">
+        <div class="seg" role="group" aria-label="用紙の詰め方">
+          <button type="button" class="seg-btn on" id="pageFit">1ページに収める</button>
+          <button type="button" class="seg-btn" id="pageLoose">文字を小さくしない</button>
+        </div>
+        <p id="pageInfo">—</p>
+      </div>
       <button class="btn btn-primary" id="btnPrint">PDFに保存・印刷する</button>
       <button class="btn btn-ghost" id="btnSaveFromPreview">保存して閉じる</button>
     </div>
@@ -1056,7 +1102,10 @@ body.dark .target-block { background: #262840; }
 </div>
 
 <!-- 印刷専用領域 -->
-<div id="printArea"><div class="paper" id="printPaper"></div></div>
+<div id="printArea"><div class="paper a4" id="printPaper"></div></div>
+
+<!-- 印刷前に何ページになるかを測るための領域（画面には出ない） -->
+<div id="measureArea" aria-hidden="true"><div class="paper a4" id="measurePaper"></div></div>
 
 <div class="toast" id="toast">
   <span id="toastText"></span>
@@ -2005,6 +2054,7 @@ function buildDocFromForm() {
     taxBreakdown: JSON.parse(JSON.stringify(c.breakdown)),
     discount: c.discount,
     discountMode: c.discountMode,
+    pageMode: pageMode,
     total: c.total
   };
 }
@@ -2024,6 +2074,7 @@ function clearForm() {
   $("targetTotal").value = "";
   targetTotalApplied = null;
   setDiscountMode("pretax");
+  pageMode = "fit";
   $("taxRate").value = "10";
   $("docDate").value = todayStr();
   setItemTax(10);
@@ -2172,23 +2223,106 @@ function paperHTML(doc) {
   );
 }
 
+/* ---------- ページ数の判定 ----------
+   明細の件数ではなく、実際に組んだときの高さで判断する。
+   件数で決めていたころは12件で2ページ・19件で1ページという逆転が起きていた。 */
+
+var densityLevels = ["", "compact", "compact tight"];
+var densityNames = { "": "そのまま", "compact": "少し詰める", "compact tight": "かなり詰める" };
+var pageHeightCache = null;
+
+function pageHeightPx() {
+  if (pageHeightCache === null) {
+    var probe = document.createElement("div");
+    probe.style.cssText = "position:absolute;visibility:hidden;height:273mm"; // A4(297mm)－上下余白12mm
+    document.body.appendChild(probe);
+    pageHeightCache = probe.getBoundingClientRect().height;
+    probe.remove();
+  }
+  return pageHeightCache;
+}
+
+function measurePages(doc, density) {
+  var m = $("measurePaper");
+  m.className = "paper a4" + (density ? " " + density : "");
+  m.innerHTML = paperHTML(doc);
+  var h = m.getBoundingClientRect().height;
+  // 1px程度の誤差でページが増えたことにならないよう少しだけ緩める
+  return { height: h, pages: Math.max(1, Math.ceil((h - 1) / pageHeightPx())) };
+}
+
+/* mode: "fit" … ページ数が最小になるまで詰める（同じページ数なら詰めない方を選ぶ）
+        "loose" … 文字の大きさを変えない */
+function chooseDensity(doc, mode) {
+  if (mode === "loose") {
+    return { density: "", pages: measurePages(doc, "").pages };
+  }
+  var best = null;
+  for (var i = 0; i < densityLevels.length; i++) {
+    var r = measurePages(doc, densityLevels[i]);
+    if (!best || r.pages < best.pages) best = { density: densityLevels[i], pages: r.pages };
+    if (best.pages === 1) break; // 1ページに収まったらこれ以上詰める必要はない
+  }
+  return best;
+}
+
+function docPageMode(doc) {
+  return doc && doc.pageMode === "loose" ? "loose" : "fit";
+}
+
+/* 作成中の書類の詰め方。プレビューで変えたらこちらにも反映する */
+var pageMode = "fit";
+
 /* ---------- プレビュー ---------- */
+var previewPageMode = "fit";
+
 function openPreview(doc, fromForm) {
   previewingDoc = doc;
+  previewPageMode = docPageMode(doc);
   $("previewPaper").innerHTML = paperHTML(doc);
   $("btnSaveFromPreview").style.display = fromForm ? "flex" : "none";
   $("previewModal").classList.add("open");
+  updatePageInfo();
 }
+
+function updatePageInfo() {
+  if (!previewingDoc) return;
+  $("pageFit").classList.toggle("on", previewPageMode === "fit");
+  $("pageLoose").classList.toggle("on", previewPageMode === "loose");
+
+  var r = chooseDensity(previewingDoc, previewPageMode);
+  var info = $("pageInfo");
+  var note = r.pages + "ページで印刷されます";
+  if (r.density) note += "（" + densityNames[r.density] + "）";
+  if (previewPageMode === "fit" && r.pages > 1) {
+    note += "。これ以上は詰められません";
+  }
+  info.textContent = note;
+  info.classList.toggle("multi", r.pages > 1);
+}
+
+function setPreviewPageMode(mode) {
+  previewPageMode = mode;
+  pageMode = mode;
+  if (previewingDoc) {
+    previewingDoc.pageMode = mode;
+    // 保存済みの書類をプレビューしている場合は、その場で覚えておく
+    if (documents.indexOf(previewingDoc) !== -1) persistDocs();
+  }
+  updatePageInfo();
+}
+
 function closePreview() {
   $("previewModal").classList.remove("open");
   previewingDoc = null;
 }
+
 function printCurrent() {
   if (!previewingDoc) return;
   var paper = $("printPaper");
   paper.innerHTML = paperHTML(previewingDoc);
-  // 明細が多いときは自動で縮小し、1〜2枚に綺麗に収める
-  paper.classList.toggle("compact", previewingDoc.items.length > 18);
+  var r = chooseDensity(previewingDoc, previewPageMode);
+  paper.className = "paper a4" + (r.density ? " " + r.density : "");
   window.print();
 }
 
@@ -2248,6 +2382,7 @@ function editDocument(idx, asNew) {
   $("targetTotal").value = "";
   targetTotalApplied = null;
   setDiscountMode(docDiscountMode(d));
+  pageMode = docPageMode(d);
   items = JSON.parse(JSON.stringify(d.items || []));
 
   clearItemForm();
@@ -2753,6 +2888,8 @@ document.addEventListener("DOMContentLoaded", function() {
     }
   });
 
+  $("pageFit").addEventListener("click", function() { setPreviewPageMode("fit"); });
+  $("pageLoose").addEventListener("click", function() { setPreviewPageMode("loose"); });
   $("btnClosePreview").addEventListener("click", closePreview);
   $("btnPrint").addEventListener("click", printCurrent);
 
